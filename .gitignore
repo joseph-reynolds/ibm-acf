@@ -1,0 +1,10 @@
+bin/
+obj/
+openssl
+scratch/
+
+celogin_cli
+
+*.o
+
+.DS_STORE
