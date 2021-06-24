@@ -10,4 +10,5 @@ namespace CeLogin
     const char* JsonName_Expiration = "expiration";
     const char* JsonName_FrameworkEc = "frameworkEc";
     const char* JsonName_SerialNumber = "serialNumber";
+    const char* JsonName_RequestId = "requestId";
 };

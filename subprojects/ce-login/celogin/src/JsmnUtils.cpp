@@ -1,17 +1,16 @@
 
-#include <jsmn.h>
-#include <stdio.h>
-#include <string.h>
-#include <cinttypes>
-
 #include "JsmnUtils.h"
 
+#include <inttypes.h>
+#include <stdio.h>
+#include <string.h>
+
 JsmnUtils::JsmnUtilRc JsmnUtils::GetNextJsonEntry(const JsmnState& jsmnState,
-                                                  const uint64_t currentIdxParm, uint64_t& nextIdxParm)
+                                                  const uint64_t currentIdxParm,
+                                                  uint64_t& nextIdxParm)
 {
     JsmnUtilRc sRc = Success;
-    if(!jsmnState.isValid()
-        || !jsmnState.isTokenIdxValid(currentIdxParm))
+    if (!jsmnState.isValid() || !jsmnState.isTokenIdxValid(currentIdxParm))
     {
         sRc = GetNextJsonEntry_InvalidParm;
     }
@@ -20,14 +19,14 @@ JsmnUtils::JsmnUtilRc JsmnUtils::GetNextJsonEntry(const JsmnState& jsmnState,
         uint64_t sTokensRemaining = jsmnState.getToken(currentIdxParm).size;
 
         nextIdxParm = currentIdxParm + 1;
-        while(sTokensRemaining > 0 && jsmnState.isTokenIdxValid(nextIdxParm))
+        while (sTokensRemaining > 0 && jsmnState.isTokenIdxValid(nextIdxParm))
         {
             sTokensRemaining += jsmnState.getToken(nextIdxParm).size;
             sTokensRemaining--;
             nextIdxParm++;
         }
 
-        if(0 != sTokensRemaining && !jsmnState.isTokenIdxValid(nextIdxParm))
+        if (0 != sTokensRemaining && !jsmnState.isTokenIdxValid(nextIdxParm))
         {
             sRc = GetNextJsonEntry_BadWalk;
         }
@@ -35,13 +34,14 @@ JsmnUtils::JsmnUtilRc JsmnUtils::GetNextJsonEntry(const JsmnState& jsmnState,
     return sRc;
 }
 
-void JsmnUtils::PrintJsmnToken(const JsmnState& jsmnStateParm, const uint64_t tokenIdxParm)
+void JsmnUtils::PrintJsmnToken(const JsmnState& jsmnStateParm,
+                               const uint64_t tokenIdxParm)
 {
-    if(jsmnStateParm.isTokenIdxValid(tokenIdxParm))
+    if (jsmnStateParm.isTokenIdxValid(tokenIdxParm))
     {
-        const jsmntok_t& sToken  = jsmnStateParm.getToken(tokenIdxParm);
+        const jsmntok_t& sToken = jsmnStateParm.getToken(tokenIdxParm);
         printf("{");
-        switch(sToken.type)
+        switch (sToken.type)
         {
             case JSMN_UNDEFINED:
             {
@@ -74,7 +74,8 @@ void JsmnUtils::PrintJsmnToken(const JsmnState& jsmnStateParm, const uint64_t to
                 break;
             }
         }
-        printf("%.*s", sToken.end - sToken.start, jsmnStateParm.mJsonString + sToken.start);
+        printf("%.*s", sToken.end - sToken.start,
+               jsmnStateParm.mJsonString + sToken.start);
         printf("}\n");
     }
     else
@@ -83,23 +84,20 @@ void JsmnUtils::PrintJsmnToken(const JsmnState& jsmnStateParm, const uint64_t to
     }
 }
 
-JsmnUtils::JsmnUtilRc JsmnUtils::ObjectGetValueByKey(const JsmnState& jsmnStateParm,
-                                                     const uint64_t objectRootIdxParm,
-                                                     const char* keyParm,
-                                                     const uint64_t keyLenParm,
-                                                     uint64_t& valueIdxParm)
+JsmnUtils::JsmnUtilRc JsmnUtils::ObjectGetValueByKey(
+    const JsmnState& jsmnStateParm, const uint64_t objectRootIdxParm,
+    const char* keyParm, const uint64_t keyLenParm, uint64_t& valueIdxParm)
 {
     JsmnUtilRc sRc = Success;
 
-    if(!jsmnStateParm.isValid()
-        || !jsmnStateParm.isTokenIdxValid(objectRootIdxParm)
-        || !keyParm
-        || 0 == keyLenParm
-        || JSMN_OBJECT != jsmnStateParm.getToken(objectRootIdxParm).type)
+    if (!jsmnStateParm.isValid() ||
+        !jsmnStateParm.isTokenIdxValid(objectRootIdxParm) || !keyParm ||
+        0 == keyLenParm ||
+        JSMN_OBJECT != jsmnStateParm.getToken(objectRootIdxParm).type)
     {
         sRc = ObjectGetValueByKey_InvalidParm;
     }
-    else if(0 == jsmnStateParm.getToken(objectRootIdxParm).size)
+    else if (0 == jsmnStateParm.getToken(objectRootIdxParm).size)
     {
         sRc = ObjectGetValueByKey_KeyNotFound;
     }
@@ -108,20 +106,22 @@ JsmnUtils::JsmnUtilRc JsmnUtils::ObjectGetValueByKey(const JsmnState& jsmnStateP
         bool sIsFound = false;
         uint64_t sFoundIdx = 0;
 
-        uint64_t sTokenIdx = objectRootIdxParm + 1; // Next token after the top level object
+        uint64_t sTokenIdx =
+            objectRootIdxParm + 1; // Next token after the top level object
 
         // Limit the number of iterations to prevent an infinite loop
-        for(uint64_t sIter = objectRootIdxParm; sIter < jsmnStateParm.mTokenArrayLength; sIter++)
+        for (uint64_t sIter = objectRootIdxParm;
+             sIter < jsmnStateParm.mTokenArrayLength; sIter++)
         {
-            if(!jsmnStateParm.isTokenIdxValid(sTokenIdx))
+            if (!jsmnStateParm.isTokenIdxValid(sTokenIdx))
             {
                 break;
             }
             JsmnString sKey = jsmnStateParm.getString(sTokenIdx);
 
-            if(SafeJsmnStringCompare(sKey, keyParm, keyLenParm))
+            if (SafeJsmnStringCompare(sKey, keyParm, keyLenParm))
             {
-                if(!sIsFound)
+                if (!sIsFound)
                 {
                     sIsFound = true;
                     sFoundIdx = sTokenIdx;
@@ -135,24 +135,24 @@ JsmnUtils::JsmnUtilRc JsmnUtils::ObjectGetValueByKey(const JsmnState& jsmnStateP
 
             uint64_t sNextTokenIdx = 0;
             // Will return the total token array length if the end is reached
-            sRc = JsmnUtils::GetNextJsonEntry(jsmnStateParm,
-                                              sTokenIdx,
+            sRc = JsmnUtils::GetNextJsonEntry(jsmnStateParm, sTokenIdx,
                                               sNextTokenIdx);
             sTokenIdx = sNextTokenIdx;
 
-            if(Success != sRc)
+            if (Success != sRc)
             {
                 break;
             }
         }
 
-        if(Success == sRc)
+        if (Success == sRc)
         {
-            if(sIsFound)
+            if (sIsFound)
             {
-                // By definition, the found object should have size = 1 (the value)
-                if(1 == jsmnStateParm.getToken(sFoundIdx).size
-                    && jsmnStateParm.isTokenIdxValid(sFoundIdx + 1))
+                // By definition, the found object should have size = 1 (the
+                // value)
+                if (1 == jsmnStateParm.getToken(sFoundIdx).size &&
+                    jsmnStateParm.isTokenIdxValid(sFoundIdx + 1))
                 {
                     valueIdxParm = sFoundIdx + 1;
                 }
@@ -170,13 +170,14 @@ JsmnUtils::JsmnUtilRc JsmnUtils::ObjectGetValueByKey(const JsmnState& jsmnStateP
     return sRc;
 }
 
-
 bool JsmnUtils::SafeJsmnStringCompare(const JsmnString& jsmnStringParm,
-                                      const char* stringParm, const uint64_t stringLengthParm)
+                                      const char* stringParm,
+                                      const uint64_t stringLengthParm)
 {
-    if(jsmnStringParm.mCharLength == stringLengthParm)
+    if (jsmnStringParm.mCharLength == stringLengthParm)
     {
-        return 0 == memcmp(jsmnStringParm.mCharArray, stringParm, stringLengthParm);
+        return 0 ==
+               memcmp(jsmnStringParm.mCharArray, stringParm, stringLengthParm);
     }
     return false;
 }
