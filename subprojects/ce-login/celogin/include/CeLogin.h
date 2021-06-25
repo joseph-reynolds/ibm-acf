@@ -76,6 +76,9 @@ struct CeLoginRc
         DetermineAuth_Asn1TimeFromUnixFailure = 0x42,
         DetermineAuth_AsnAllocFailure = 0x43,
         DetermineAuth_Asn1TimeCompareFailure = 0x44,
+        DetermineAuth_GetAsn1UnixEpoch = 0x45,
+        DetermineAuth_Asn1ExpirationToUnixFailure = 0x46,
+        DetermineAuth_Asn1ExpirationToUnixOsslFailure = 0x47,
 
         Util_ValueFromJsonTagFailure = 0x50,
 
@@ -140,7 +143,8 @@ CeLoginRc getServiceAuthorityV1(
     const uint64_t passwordLengthParm,
     const uint64_t timeSinceUnixEpocInSecondsParm, const uint8_t* publicKeyParm,
     const uint64_t publicKeyLengthParm, const char* serialNumberParm,
-    const uint64_t serialNumberLengthParm, ServiceAuthority& authorityParm);
+    const uint64_t serialNumberLengthParm, ServiceAuthority& authorityParm,
+    uint64_t& expirationTimeParm);
 
 } // namespace CeLogin
 

@@ -190,12 +190,15 @@ bool cli::verifyHsf(int argc, char** argv)
             {
                 std::time_t sTime = std::time(NULL);
                 CeLogin::ServiceAuthority sAuth = CeLogin::ServiceAuth_None;
+                uint64_t sExpiration;
+
                 CeLogin::CeLoginRc sRc = CeLogin::getServiceAuthorityV1(
                     sHsf.data(), sHsf.size(),
                     (const uint8_t*)sArgs.mPassword.data(),
                     sArgs.mPassword.size(), sTime, sPublicKey.data(),
                     sPublicKey.size(), sArgs.mSerialNumber.data(),
-                    sArgs.mSerialNumber.size(), sAuth);
+                    sArgs.mSerialNumber.size(), sAuth, sExpiration);
+
                 if (CeLoginRc::Success == sRc)
                 {
                     std::cout << "ACF/password is valid" << std::endl;
@@ -239,6 +242,7 @@ bool cli::verifyHsf(int argc, char** argv)
                         break;
                     }
                 }
+                printf("Expiration (UNIX): %llu\n", sExpiration);
             }
             else
             {
