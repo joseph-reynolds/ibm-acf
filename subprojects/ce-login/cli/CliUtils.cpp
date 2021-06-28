@@ -1,14 +1,14 @@
-#include <iostream>
+#include "CliUtils.h"
+
+#include <cinttypes>
 #include <fstream>
+#include <iostream>
+#include <sstream>
 #include <string>
 #include <vector>
 
-#include <cinttypes>
-#include <sstream>
-
-#include "CliUtils.h"
-
-bool cli::readBinaryFile(const std::string fileNameParm, std::vector<uint8_t>& bufferParm)
+bool cli::readBinaryFile(const std::string fileNameParm,
+                         std::vector<uint8_t>& bufferParm)
 {
     std::ifstream sInputFile;
     if (!fileNameParm.empty())
@@ -24,7 +24,7 @@ bool cli::readBinaryFile(const std::string fileNameParm, std::vector<uint8_t>& b
             bufferParm.reserve(size);
             bufferParm.assign(size, 0);
 
-            sInputFile.read((char *)bufferParm.data(), size);
+            sInputFile.read((char*)bufferParm.data(), size);
             sInputFile.close();
 
             return true;
@@ -33,7 +33,6 @@ bool cli::readBinaryFile(const std::string fileNameParm, std::vector<uint8_t>& b
         {
             std::cout << "Failed to open file " << std::endl;
         }
-
     }
     else
     {
@@ -44,15 +43,17 @@ bool cli::readBinaryFile(const std::string fileNameParm, std::vector<uint8_t>& b
 }
 
 bool cli::writeBinaryFile(const std::string fileNameParm,
-                          const uint8_t* bufferParm, const uint64_t bufferLengthParm)
+                          const uint8_t* bufferParm,
+                          const uint64_t bufferLengthParm)
 {
     std::ofstream sOutputFile;
     if (!fileNameParm.empty() && bufferParm)
     {
-        sOutputFile.open(fileNameParm.c_str(), std::ios::out | std::ios::trunc | std::ios::binary);
+        sOutputFile.open(fileNameParm.c_str(),
+                         std::ios::out | std::ios::trunc | std::ios::binary);
         if (sOutputFile.is_open())
         {
-            sOutputFile.write((const char *)bufferParm, bufferLengthParm);
+            sOutputFile.write((const char*)bufferParm, bufferLengthParm);
             sOutputFile.close();
             return true;
         }
@@ -64,7 +65,7 @@ std::string cli::getHexStringFromBinary(const std::vector<uint8_t>& binaryParm)
 {
     std::stringstream ss;
 
-    for(uint64_t sIdx = 0; sIdx < binaryParm.size(); sIdx++)
+    for (uint64_t sIdx = 0; sIdx < binaryParm.size(); sIdx++)
     {
         ss.fill('0');
         ss.width(2);
@@ -73,14 +74,16 @@ std::string cli::getHexStringFromBinary(const std::vector<uint8_t>& binaryParm)
     return ss.str();
 }
 
-bool cli::getIntFromJson(json_object* jsonObjectParm, const std::string keyParm, int32_t& resultIntParm)
+bool cli::getIntFromJson(json_object* jsonObjectParm, const std::string keyParm,
+                         int32_t& resultIntParm)
 {
     bool sSuccess = false;
-    if(jsonObjectParm)
+    if (jsonObjectParm)
     {
         json_object* sSubObject = NULL;
-        bool sResult = json_object_object_get_ex(jsonObjectParm, keyParm.data(), &sSubObject);
-        if(sResult && sSubObject)
+        bool sResult = json_object_object_get_ex(jsonObjectParm, keyParm.data(),
+                                                 &sSubObject);
+        if (sResult && sSubObject)
         {
             resultIntParm = json_object_get_int(sSubObject);
             sSuccess = true;
@@ -89,17 +92,20 @@ bool cli::getIntFromJson(json_object* jsonObjectParm, const std::string keyParm,
     return sSuccess;
 }
 
-bool cli::getStringFromJson(json_object* jsonObjectParm, const std::string keyParm, std::string& resultStringParm)
+bool cli::getStringFromJson(json_object* jsonObjectParm,
+                            const std::string keyParm,
+                            std::string& resultStringParm)
 {
     bool sSuccess = false;
-    if(jsonObjectParm)
+    if (jsonObjectParm)
     {
         json_object* sSubObject = NULL;
-        bool sResult = json_object_object_get_ex(jsonObjectParm, keyParm.data(), &sSubObject);
-        if(sResult && sSubObject)
+        bool sResult = json_object_object_get_ex(jsonObjectParm, keyParm.data(),
+                                                 &sSubObject);
+        if (sResult && sSubObject)
         {
             const int sStringLength = json_object_get_string_len(sSubObject);
-            if(sStringLength > 0)
+            if (sStringLength > 0)
             {
                 const char* sString = json_object_get_string(sSubObject);
                 resultStringParm = std::string(sString, sStringLength);

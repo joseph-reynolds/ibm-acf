@@ -1,56 +1,40 @@
 
+#include "CeLoginCli.h"
+#include "CliCeLoginV1.h"
+#include "CliUtils.h"
+
+#include <CeLogin.h>
+#include <getopt.h>
+#include <string.h>
+
+#include <cinttypes>
+#include <fstream>
 #include <iostream>
 #include <sstream>
 #include <string>
-#include <string.h>
-#include <getopt.h>
-#include <fstream>
 #include <vector>
 
-#include <cinttypes>
-
-#include <CeLogin.h>
-
-#include "CliUtils.h"
-#include "CliCeLoginV1.h"
-
-#include "CeLoginCli.h"
+using namespace std;
 
 struct CreateArguments
 {
-    const char* mProcessingType;
-    const char* mSourceFileName;
-    const char* mSerialNumber;
-    const char* mFrameworkEc;
-    const char* mPassword;
-    const char* mExpirationDate;
-    const char* mRequestId;
-    const char* mPrivateKeyFile;
-    const char* mOutputFile;
+    string mSourceFileName;
+    vector<CeLogin::Machine> mMachines;
+    string mPassword;
+    string mExpirationDate;
+    string mRequestId;
+    string mPrivateKeyFile;
+    string mOutputFile;
     bool mVerbose;
     bool mHelp;
-    CreateArguments()
-    {
-        mProcessingType = NULL;
-        mSourceFileName = NULL;
-        mSerialNumber = NULL;
-        mFrameworkEc = NULL;
-        mPassword = NULL;
-        mExpirationDate = NULL;
-        mRequestId = NULL;
-        mPrivateKeyFile = NULL;
-        mOutputFile = NULL;
-        mVerbose = false;
-        mHelp = false;
-    }
+    CreateArguments() : mVerbose(false), mHelp(false)
+    {}
 };
 
 enum CreateOptOptions
 {
-    ProcessingType,
     SourceFileName,
-    SerialNumber,
-    FrameworkEc,
+    Machine,
     Password,
     ExpirationDate,
     RequestId,
@@ -62,81 +46,118 @@ enum CreateOptOptions
 };
 
 struct option create_long_options[NOptOptions + 1] = {
-    {"processingType", required_argument, NULL, 't'},
     {"sourceFileName", required_argument, NULL, 'f'},
-    {"serialNumber",   required_argument, NULL, 's'},
-    {"frameworkEc",    required_argument, NULL, 'c'},
-    {"password",       required_argument, NULL, 'p'},
+    {"machine", required_argument, NULL, 'm'},
+    {"password", required_argument, NULL, 'p'},
     {"expirationDate", required_argument, NULL, 'e'},
-    {"requestId",      required_argument, NULL, 'i'},
-    {"pkey",           required_argument, NULL, 'k'},
-    {"output",         required_argument, NULL, 'o'},
-    {"help",           no_argument,       NULL, 'h'},
-    {"verbose",        no_argument,       NULL, 'v'},
-    {0,                0,                 0,     0}
-};
+    {"requestId", required_argument, NULL, 'i'},
+    {"pkey", required_argument, NULL, 'k'},
+    {"output", required_argument, NULL, 'o'},
+    {"help", no_argument, NULL, 'h'},
+    {"verbose", no_argument, NULL, 'v'},
+    {0, 0, 0, 0}};
 
-std::string create_options_description[NOptOptions] =
+string create_options_description[NOptOptions] = {
+    "SourceFileName", "<processor gen>,<authority>,<serial number>",
+    "Password",       "ExpirationDate",
+    "RequestId",      "PrivateKeyFile",
+    "OutputFile",     "Help",
+    "Verbose"};
+
+bool parseMachineFromString(const string& stringParm,
+                            CeLogin::Machine& machineParm)
 {
-    "ProcessingType",
-    "SourceFileName",
-    "SerialNumber",
-    "FrameworkEc",
-    "Password",
-    "ExpirationDate",
-    "RequestId",
-    "PrivateKeyFile",
-    "OutputFile",
-    "Help",
-    "Verbose"
-};
+    bool sIsSuccess = false;
 
+    size_t sCount = count(stringParm.begin(), stringParm.end(), ',');
+    if (2 == sCount)
+    {
+        size_t sFirstDelimiter = stringParm.find(',');
+        size_t sSecondDelimiter = stringParm.find(',', sFirstDelimiter + 1);
+
+        string sProcStr = stringParm.substr(0, sFirstDelimiter);
+        string sAuthStr = stringParm.substr(
+            sFirstDelimiter + 1, sSecondDelimiter - sFirstDelimiter - 1);
+        string sSerialStr = stringParm.substr(
+            sSecondDelimiter + 1, stringParm.length() - sSecondDelimiter - 1);
+
+        // TODO: force sProcStr and sAuthStr to a consistant case for better
+        // parsing
+
+        if (0 == sProcStr.compare("P10"))
+        {
+            CeLogin::ServiceAuthority sAuth = CeLogin::ServiceAuth_None;
+            if (0 == sAuthStr.compare("dev"))
+            {
+                sAuth = CeLogin::ServiceAuth_Dev;
+            }
+            else if (0 == sAuthStr.compare("ce"))
+            {
+                sAuth = CeLogin::ServiceAuth_CE;
+            }
+
+            if (CeLogin::ServiceAuth_None != sAuth)
+            {
+                if (!sSerialStr.empty())
+                {
+                    machineParm.mAuth = sAuth;
+                    machineParm.mProc = CeLogin::P10;
+                    machineParm.mSerialNumber = sSerialStr;
+                    sIsSuccess = true;
+                }
+            }
+        }
+    }
+    return sIsSuccess;
+}
 
 void createParseArgs(int argc, char** argv, struct CreateArguments& args)
 {
-    std::string short_options = "";
+    string short_options = "";
 
-    for(int i = 0; i < NOptOptions; i++)
+    for (int i = 0; i < NOptOptions; i++)
     {
         short_options += create_long_options[i].val;
-        if(required_argument == create_long_options[i].has_arg)
+        if (required_argument == create_long_options[i].has_arg)
         {
             short_options += ":";
         }
     }
 
     int c;
-    int digit_optind = 0;
     int sNumOfRequiredArgumentsFound = 0;
-    while(1)
+    while (1)
     {
         int option_index = 0;
-        c = getopt_long(argc, argv, short_options.c_str(), create_long_options, &option_index);
-        if (c == -1) break;
+        c = getopt_long(argc, argv, short_options.c_str(), create_long_options,
+                        &option_index);
+        if (c == -1)
+            break;
         switch (c)
         {
-            case 't':
-            {
-                sNumOfRequiredArgumentsFound++;
-                args.mProcessingType = optarg;
-                break;
-            }
             case 'f':
             {
                 sNumOfRequiredArgumentsFound++;
                 args.mSourceFileName = optarg;
                 break;
             }
-            case 's':
+            case 'm':
             {
                 sNumOfRequiredArgumentsFound++;
-                args.mSerialNumber = optarg;
-                break;
-            }
-            case 'c':
-            {
-                sNumOfRequiredArgumentsFound++;
-                args.mFrameworkEc = optarg;
+                // Expected format: <processor gen>,<authority>,<serial number>
+                // Example: P10,Dev,12345
+                string sArg = optarg;
+                // Count the number of delimiters, should be 2
+                CeLogin::Machine sMachine;
+                if (parseMachineFromString(sArg, sMachine))
+                {
+                    args.mMachines.push_back(sMachine);
+                }
+                else
+                {
+                    cout << "ERROR: Unexpected string for machine type: \""
+                         << sArg << "\"" << endl;
+                }
                 break;
             }
             case 'p':
@@ -181,7 +202,6 @@ void createParseArgs(int argc, char** argv, struct CreateArguments& args)
             }
             default:
             {
-                std::cout << "Unknown";
             }
         }
     }
@@ -190,50 +210,40 @@ void createParseArgs(int argc, char** argv, struct CreateArguments& args)
 bool createValidateArgs(const CreateArguments& args)
 {
     bool sIsValidArgs = true;
-    if(NULL == args.mProcessingType)
+    if (args.mSourceFileName.empty())
     {
         sIsValidArgs = false;
-        std::cout << "Error: Missing Processing Type" << std::endl;
+        cout << "Error: Missing SourceFileName" << endl;
     }
-    if(NULL == args.mSourceFileName)
+    if (args.mMachines.empty())
     {
         sIsValidArgs = false;
-        std::cout << "Error: Missing SourceFileName" << std::endl;
+        cout << "Error: Missing Machine Entry" << endl;
     }
-    if(NULL == args.mSerialNumber)
+    if (args.mPassword.empty())
     {
         sIsValidArgs = false;
-        std::cout << "Error: Missing SerialNumber" << std::endl;
+        cout << "Error: Missing Password" << endl;
     }
-    if(NULL == args.mFrameworkEc)
+    if (args.mExpirationDate.empty())
     {
         sIsValidArgs = false;
-        std::cout << "Error: Missing FrameworkEc" << std::endl;
+        cout << "Error: Missing ExpirationDate" << endl;
     }
-    if(NULL == args.mPassword)
+    if (args.mRequestId.empty())
     {
         sIsValidArgs = false;
-        std::cout << "Error: Missing Password" << std::endl;
+        cout << "Error: Missing RequestId" << endl;
     }
-    if(NULL == args.mExpirationDate)
+    if (args.mPrivateKeyFile.empty())
     {
         sIsValidArgs = false;
-        std::cout << "Error: Missing ExpirationDate" << std::endl;
+        cout << "Error: Missing PrivateKeyPath" << endl;
     }
-    if(NULL == args.mRequestId)
+    if (args.mOutputFile.empty())
     {
         sIsValidArgs = false;
-        std::cout << "Error: Missing RequestId" << std::endl;
-    }
-    if(NULL == args.mPrivateKeyFile)
-    {
-        sIsValidArgs = false;
-        std::cout << "Error: Missing PrivateKeyPath" << std::endl;
-    }
-    if(NULL == args.mOutputFile)
-    {
-        sIsValidArgs = false;
-        std::cout << "Error: Missing OutputFilePath" << std::endl;
+        cout << "Error: Missing OutputFilePath" << endl;
     }
     return sIsValidArgs;
 }
@@ -242,22 +252,23 @@ void createPrintHelp(int argc, char** argv)
 {
     // Find the longest option
     size_t sLongestOpt = 0;
-    for(unsigned int i = 0; i < NOptOptions; i++)
+    for (unsigned int i = 0; i < NOptOptions; i++)
     {
         size_t sLength = strlen(create_long_options[i].name);
-        sLongestOpt = std::max<size_t>(sLongestOpt, sLength);
+        sLongestOpt = max<size_t>(sLongestOpt, sLength);
     }
 
-    std::cout << "Usage: " << argv[0] << " " << argv[1] << std::endl;
-    for(unsigned int i = 0; i < NOptOptions; i++)
+    cout << "Usage: " << argv[0] << " " << argv[1] << endl;
+    for (unsigned int i = 0; i < NOptOptions; i++)
     {
         size_t sLength = strlen(create_long_options[i].name);
-        std::cout << "\t-" << (char)create_long_options[i].val << " --" << create_long_options[i].name;
-        for(size_t j = 0; j < (sLongestOpt - sLength); j++)
+        cout << "\t-" << (char)create_long_options[i].val << " --"
+             << create_long_options[i].name;
+        for (size_t j = 0; j < (sLongestOpt - sLength); j++)
         {
-            std::cout << " ";
+            cout << " ";
         }
-        std::cout << " | " << create_options_description[i] << std::endl;
+        cout << " | " << create_options_description[i] << endl;
     }
 }
 
@@ -267,49 +278,45 @@ bool cli::createHsf(int argc, char** argv)
 
     createParseArgs(argc - 1, argv + 1, sArgs);
 
-    if(sArgs.mHelp)
+    if (sArgs.mHelp)
     {
         createPrintHelp(argc, argv);
     }
-    else if(createValidateArgs(sArgs))
+    else if (createValidateArgs(sArgs))
     {
         CeLogin::CeLoginCreateHsfArgsV1 sCreateHsfArgs;
 
-        sCreateHsfArgs.mProcessingType = sArgs.mProcessingType;
-
         sCreateHsfArgs.mSourceFileName = sArgs.mSourceFileName;
 
-        sCreateHsfArgs.mSerialNumber = sArgs.mSerialNumber;
+        sCreateHsfArgs.mMachines = sArgs.mMachines;
 
-        sCreateHsfArgs.mFrameworkEc = sArgs.mFrameworkEc;
-
-        sCreateHsfArgs.mPassword = std::vector<uint8_t>((uint8_t*)sArgs.mPassword, (uint8_t*)sArgs.mPassword + strlen(sArgs.mPassword));
+        sCreateHsfArgs.mPassword = vector<uint8_t>(sArgs.mPassword.length());
+        copy(sArgs.mPassword.begin(), sArgs.mPassword.end(),
+             sCreateHsfArgs.mPassword.begin());
 
         sCreateHsfArgs.mExpirationDate = sArgs.mExpirationDate;
 
         sCreateHsfArgs.mRequestId = sArgs.mRequestId;
 
-        std::vector<uint8_t> sKey;
+        vector<uint8_t> sKey;
 
-        if(readBinaryFile(std::string(sArgs.mPrivateKeyFile), sKey))
+        if (readBinaryFile(string(sArgs.mPrivateKeyFile), sKey))
         {
             sCreateHsfArgs.mPrivateKey = sKey;
         }
 
-        std::vector<uint8_t> sAcfBinary;
-        CeLogin::CeLoginRc sRc = CeLogin::createCeLoginAcfV1(sCreateHsfArgs, sAcfBinary);
-        std::cout << "RC: " << std::hex << (int)sRc << std::endl;
+        vector<uint8_t> sAcfBinary;
+        CeLogin::CeLoginRc sRc =
+            CeLogin::createCeLoginAcfV1(sCreateHsfArgs, sAcfBinary);
+        cout << "RC: " << hex << (int)sRc << endl;
 
-        std::cout << sAcfBinary.size() << std::endl;
+        cout << sAcfBinary.size() << endl;
 
-        if(!writeBinaryFile(sArgs.mOutputFile, sAcfBinary.data(), sAcfBinary.size()))
+        if (!writeBinaryFile(sArgs.mOutputFile, sAcfBinary.data(),
+                             sAcfBinary.size()))
         {
-            std::cout << "Error in file" << std::endl;
+            cout << "Error in file" << endl;
         }
-
     }
-
-
-
     return true;
 }
