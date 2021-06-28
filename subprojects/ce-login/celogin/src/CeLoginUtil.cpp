@@ -280,7 +280,7 @@ CeLogin::CeLoginRc CeLogin::createDigest(const uint8_t* inputDataParm,
 }
 
 CeLogin::CeLoginRc CeLogin::createPasswordHash(
-    const uint8_t* inputDataParm, const uint64_t inputDataLengthParm,
+    const char* inputDataParm, const uint64_t inputDataLengthParm,
     uint8_t* outputHashParm, const uint64_t outputHashSizeParm)
 {
     CeLoginRc sRc = CeLoginRc::Success;
@@ -302,8 +302,9 @@ CeLogin::CeLoginRc CeLogin::createPasswordHash(
     }
     else
     {
-        uint8_t* sHashResult =
-            SHA512(inputDataParm, inputDataLengthParm, outputHashParm);
+        // Cast const char* to const uint8_t*
+        uint8_t* sHashResult = SHA512((const uint8_t*)inputDataParm,
+                                      inputDataLengthParm, outputHashParm);
 
         if (outputHashParm != sHashResult)
         {

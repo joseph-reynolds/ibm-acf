@@ -193,8 +193,7 @@ bool cli::verifyHsf(int argc, char** argv)
                 uint64_t sExpiration;
 
                 CeLogin::CeLoginRc sRc = CeLogin::getServiceAuthorityV1(
-                    sHsf.data(), sHsf.size(),
-                    (const uint8_t*)sArgs.mPassword.data(),
+                    sHsf.data(), sHsf.size(), sArgs.mPassword.data(),
                     sArgs.mPassword.size(), sTime, sPublicKey.data(),
                     sPublicKey.size(), sArgs.mSerialNumber.data(),
                     sArgs.mSerialNumber.size(), sAuth, sExpiration);

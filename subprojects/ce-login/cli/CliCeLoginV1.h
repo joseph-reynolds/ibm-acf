@@ -34,7 +34,7 @@ struct CeLoginCreateHsfArgsV1
     std::vector<CeLogin::Machine> mMachines;
     std::string mExpirationDate;
     std::string mRequestId;
-    std::vector<uint8_t> mPassword;
+    std::string mPassword;
     std::vector<uint8_t> mPrivateKey;
 };
 

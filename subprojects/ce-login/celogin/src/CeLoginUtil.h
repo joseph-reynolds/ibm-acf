@@ -53,7 +53,7 @@ CeLoginRc createDigest(const uint8_t* inputDataParm,
                        uint8_t* outputHashParm,
                        const uint64_t outputHashSizeParm);
 
-CeLoginRc createPasswordHash(const uint8_t* inputDataParm,
+CeLoginRc createPasswordHash(const char* inputDataParm,
                              const uint64_t inputDataLengthParm,
                              uint8_t* outputHashParm,
                              const uint64_t outputHashSizeParm);

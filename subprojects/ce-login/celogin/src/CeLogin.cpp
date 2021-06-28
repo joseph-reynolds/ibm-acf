@@ -16,7 +16,7 @@ const char* AcfProcessingType = "P";
 
 CeLogin::CeLoginRc CeLogin::getServiceAuthorityV1(
     const uint8_t* accessControlFileParm,
-    const uint64_t accessControlFileLengthParm, const uint8_t* passwordParm,
+    const uint64_t accessControlFileLengthParm, const char* passwordParm,
     const uint64_t passwordLengthParm,
     const uint64_t timeSinceUnixEpocInSecondsParm, const uint8_t* publicKeyParm,
     const uint64_t publicKeyLengthParm, const char* serialNumberParm,
