@@ -30,16 +30,20 @@ CeLogin::CeLoginRc CeLogin::getServiceAuthorityV1(
     CELoginSequenceV1* sDecodedAsn = NULL;
 
     // Allocate on heap to avoid blowing the stack
-    CeLoginJsonData* sJsonData = new CeLoginJsonData();
+    CeLoginJsonData* sJsonData =
+        (CeLoginJsonData*)OPENSSL_malloc(sizeof(CeLoginJsonData));
+    if (sJsonData)
+    {
+        memset(sJsonData, 0x00, sizeof(CeLoginJsonData));
+    }
+    else
+    {
+        sRc = CeLoginRc::JsonDataAllocationFailure;
+    }
 
     // Stack copy to store the parsed expiration time into. Only pass back
     // the value if the authority has validated as CE or Dev.
     uint64_t sExpirationTime = 0;
-
-    if (!sJsonData)
-    {
-        sRc = CeLoginRc::JsonDataAllocationFailure;
-    }
 
     if (CeLoginRc::Success == sRc)
     {
@@ -179,7 +183,7 @@ CeLogin::CeLoginRc CeLogin::getServiceAuthorityV1(
     if (sDecodedAsn)
         CELoginSequenceV1_free(sDecodedAsn);
     if (sJsonData)
-        delete sJsonData;
+        OPENSSL_free(sJsonData);
 
     return sRc;
 }
