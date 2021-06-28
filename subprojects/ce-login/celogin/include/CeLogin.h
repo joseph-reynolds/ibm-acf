@@ -30,6 +30,8 @@ struct CeLoginRc
         Base = 0,
         JsonUtils = 1, // Implementation Specific
         JsmnUtils = 2, // Implementation Specific
+
+        // Must fit in 1 byte
     };
 
     enum RcBase
@@ -113,28 +115,26 @@ struct CeLoginRc
         GetAuthFromFrameworkEc_InvalidParm = 0xC0,
         GetAuthFromFrameworkEc_InvalidFrameworkEc = 0xC1,
 
+        // Must fit in 1-byte
     };
 
     inline CeLoginRc(const RcBase reasonParm) :
-        mComponent(Base), mRsvd0(0), mRsvd1(0), mReason(reasonParm)
+        mComponent(Base), mReason(reasonParm)
     {}
 
-    inline CeLoginRc(const Component componentParm, const uint32_t reasonParm) :
-        mComponent(0 == reasonParm ? 0 : componentParm), mRsvd0(0), mRsvd1(0),
-        mReason(reasonParm)
+    inline CeLoginRc(const Component componentParm, const uint8_t reasonParm) :
+        mComponent(0 == reasonParm ? 0 : componentParm), mReason(reasonParm)
     {}
 
-    operator uint64_t() const
+    operator uint16_t() const
     {
         // Format manually to allow for consistant behavior on Big vs Little
         // Endian systems
-        return (uint64_t)mComponent << 56 | (uint64_t)mReason;
+        return (uint8_t)mComponent << 8 | (uint8_t)mReason;
     }
 
     uint8_t mComponent;
-    uint8_t mRsvd0;
-    uint16_t mRsvd1;
-    uint32_t mReason;
+    uint8_t mReason;
 };
 
 CeLoginRc getServiceAuthorityV1(
