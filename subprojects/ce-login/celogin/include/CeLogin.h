@@ -30,6 +30,8 @@ struct CeLoginRc
         Base = 0,
         JsonUtils = 1, // Implementation Specific
         JsmnUtils = 2, // Implementation Specific
+
+        // Must fit in 1 byte
     };
 
     enum RcBase
@@ -76,6 +78,9 @@ struct CeLoginRc
         DetermineAuth_Asn1TimeFromUnixFailure = 0x42,
         DetermineAuth_AsnAllocFailure = 0x43,
         DetermineAuth_Asn1TimeCompareFailure = 0x44,
+        DetermineAuth_GetAsn1UnixEpoch = 0x45,
+        DetermineAuth_Asn1ExpirationToUnixFailure = 0x46,
+        DetermineAuth_Asn1ExpirationToUnixOsslFailure = 0x47,
 
         Util_ValueFromJsonTagFailure = 0x50,
 
@@ -110,37 +115,36 @@ struct CeLoginRc
         GetAuthFromFrameworkEc_InvalidParm = 0xC0,
         GetAuthFromFrameworkEc_InvalidFrameworkEc = 0xC1,
 
+        // Must fit in 1-byte
     };
 
     inline CeLoginRc(const RcBase reasonParm) :
-        mComponent(Base), mRsvd0(0), mRsvd1(0), mReason(reasonParm)
+        mComponent(Base), mReason(reasonParm)
     {}
 
-    inline CeLoginRc(const Component componentParm, const uint32_t reasonParm) :
-        mComponent(0 == reasonParm ? 0 : componentParm), mRsvd0(0), mRsvd1(0),
-        mReason(reasonParm)
+    inline CeLoginRc(const Component componentParm, const uint8_t reasonParm) :
+        mComponent(0 == reasonParm ? 0 : componentParm), mReason(reasonParm)
     {}
 
-    operator uint64_t() const
+    operator uint16_t() const
     {
         // Format manually to allow for consistant behavior on Big vs Little
         // Endian systems
-        return (uint64_t)mComponent << 56 | (uint64_t)mReason;
+        return (uint8_t)mComponent << 8 | (uint8_t)mReason;
     }
 
     uint8_t mComponent;
-    uint8_t mRsvd0;
-    uint16_t mRsvd1;
-    uint32_t mReason;
+    uint8_t mReason;
 };
 
 CeLoginRc getServiceAuthorityV1(
     const uint8_t* accessControlFileParm,
-    const uint64_t accessControlFileLengthParm, const uint8_t* passwordParm,
+    const uint64_t accessControlFileLengthParm, const char* passwordParm,
     const uint64_t passwordLengthParm,
     const uint64_t timeSinceUnixEpocInSecondsParm, const uint8_t* publicKeyParm,
     const uint64_t publicKeyLengthParm, const char* serialNumberParm,
-    const uint64_t serialNumberLengthParm, ServiceAuthority& authorityParm);
+    const uint64_t serialNumberLengthParm, ServiceAuthority& authorityParm,
+    uint64_t& expirationTimeParm);
 
 } // namespace CeLogin
 

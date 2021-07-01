@@ -16,12 +16,12 @@ const char* AcfProcessingType = "P";
 
 CeLogin::CeLoginRc CeLogin::getServiceAuthorityV1(
     const uint8_t* accessControlFileParm,
-    const uint64_t accessControlFileLengthParm, const uint8_t* passwordParm,
+    const uint64_t accessControlFileLengthParm, const char* passwordParm,
     const uint64_t passwordLengthParm,
     const uint64_t timeSinceUnixEpocInSecondsParm, const uint8_t* publicKeyParm,
     const uint64_t publicKeyLengthParm, const char* serialNumberParm,
     const uint64_t serialNumberLengthParm,
-    CeLogin::ServiceAuthority& authorityParm)
+    CeLogin::ServiceAuthority& authorityParm, uint64_t& expirationTimeParm)
 {
     CeLoginRc sRc = CeLoginRc::Success;
     authorityParm = CeLogin::ServiceAuth_None;
@@ -30,12 +30,20 @@ CeLogin::CeLoginRc CeLogin::getServiceAuthorityV1(
     CELoginSequenceV1* sDecodedAsn = NULL;
 
     // Allocate on heap to avoid blowing the stack
-    CeLoginJsonData* sJsonData = new CeLoginJsonData();
-
-    if (!sJsonData)
+    CeLoginJsonData* sJsonData =
+        (CeLoginJsonData*)OPENSSL_malloc(sizeof(CeLoginJsonData));
+    if (sJsonData)
+    {
+        memset(sJsonData, 0x00, sizeof(CeLoginJsonData));
+    }
+    else
     {
         sRc = CeLoginRc::JsonDataAllocationFailure;
     }
+
+    // Stack copy to store the parsed expiration time into. Only pass back
+    // the value if the authority has validated as CE or Dev.
+    uint64_t sExpirationTime = 0;
 
     if (CeLoginRc::Success == sRc)
     {
@@ -60,15 +68,53 @@ CeLogin::CeLoginRc CeLogin::getServiceAuthorityV1(
     // Verify that the ACF has not expired (using UTC)
     if (CeLoginRc::Success == sRc)
     {
+        ASN1_TIME* sAsn1UnixEpoch = ASN1_TIME_new();
         ASN1_TIME* sAsn1CurTime = ASN1_TIME_new();
         ASN1_TIME* sAsn1ExpirationTime = ASN1_TIME_new();
-        if (!sAsn1CurTime || !sAsn1ExpirationTime)
+        if (!sAsn1CurTime || !sAsn1ExpirationTime || !sAsn1UnixEpoch)
         {
             sRc = CeLoginRc::DetermineAuth_Asn1TimeAllocFailure;
         }
         else
         {
-            sRc = getAsn1Time(sJsonData->mExpirationDate, sAsn1ExpirationTime);
+            ASN1_TIME* sResult = ASN1_TIME_set(sAsn1UnixEpoch, 0);
+            if (sResult != sAsn1UnixEpoch)
+            {
+                sRc = CeLoginRc::DetermineAuth_GetAsn1UnixEpoch;
+            }
+
+            if (CeLoginRc::Success == sRc)
+            {
+                sRc = getAsn1Time(sJsonData->mExpirationDate,
+                                  sAsn1ExpirationTime);
+            }
+
+            // Get the expiration time in seconds since unix epoch
+            if (CeLoginRc::Success == sRc)
+            {
+                int sDay = 0;
+                int sSec = 0;
+                // ASN1_Time_diff returns 1 on success
+                if (1 == ASN1_TIME_diff(&sDay, &sSec, sAsn1UnixEpoch,
+                                        sAsn1ExpirationTime))
+                {
+                    // If these numbers are negative this math fails
+                    if (sDay >= 0 && sSec >= 0)
+                    {
+                        // Convert days to seconds and add remaining seconds
+                        sExpirationTime = (sDay * 24 * 60 * 60) + sSec;
+                    }
+                    else
+                    {
+                        sRc = CeLoginRc::
+                            DetermineAuth_Asn1ExpirationToUnixOsslFailure;
+                    }
+                }
+                else
+                {
+                    sRc = CeLoginRc::DetermineAuth_Asn1ExpirationToUnixFailure;
+                }
+            }
 
             if (CeLoginRc::Success == sRc)
             {
@@ -76,29 +122,35 @@ CeLogin::CeLoginRc CeLogin::getServiceAuthorityV1(
                 // occurred.
                 ASN1_TIME* sResult =
                     ASN1_TIME_set(sAsn1CurTime, timeSinceUnixEpocInSecondsParm);
+
                 if (sResult != sAsn1CurTime)
                 {
                     sRc = CeLoginRc::DetermineAuth_Asn1TimeFromUnixFailure;
                 }
             }
 
-            // returns -1 if a is before b, 0 if a equals b, or 1 if a is after
-            // b. -2 is returned on error.
-            const int sCompareResult =
-                ASN1_TIME_compare(sAsn1CurTime, sAsn1ExpirationTime);
+            if (CeLoginRc::Success == sRc)
+            {
+                // returns -1 if a is before b, 0 if a equals b, or 1 if a is
+                // after b. -2 is returned on error.
+                const int sCompareResult =
+                    ASN1_TIME_compare(sAsn1CurTime, sAsn1ExpirationTime);
 
-            if (1 == sCompareResult)
-            {
-                // The expiration date has passed
-                sRc = CeLoginRc::AcfExpired;
-            }
-            else if (-2 == sCompareResult)
-            {
-                // A failure occurred in the comparison routine.
-                sRc = CeLoginRc::DetermineAuth_Asn1TimeCompareFailure;
+                if (1 == sCompareResult)
+                {
+                    // The expiration date has passed
+                    sRc = CeLoginRc::AcfExpired;
+                }
+                else if (-2 == sCompareResult)
+                {
+                    // A failure occurred in the comparison routine.
+                    sRc = CeLoginRc::DetermineAuth_Asn1TimeCompareFailure;
+                }
             }
         }
 
+        if (sAsn1UnixEpoch)
+            ASN1_TIME_free(sAsn1UnixEpoch);
         if (sAsn1CurTime)
             ASN1_TIME_free(sAsn1CurTime);
         if (sAsn1ExpirationTime)
@@ -125,12 +177,13 @@ CeLogin::CeLoginRc CeLogin::getServiceAuthorityV1(
     if (CeLoginRc::Success == sRc)
     {
         authorityParm = sJsonData->mRequestedAuthority;
+        expirationTimeParm = sExpirationTime;
     }
 
     if (sDecodedAsn)
         CELoginSequenceV1_free(sDecodedAsn);
     if (sJsonData)
-        delete sJsonData;
+        OPENSSL_free(sJsonData);
 
     return sRc;
 }

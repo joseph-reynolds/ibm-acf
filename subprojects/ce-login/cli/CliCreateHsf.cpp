@@ -290,9 +290,7 @@ bool cli::createHsf(int argc, char** argv)
 
         sCreateHsfArgs.mMachines = sArgs.mMachines;
 
-        sCreateHsfArgs.mPassword = vector<uint8_t>(sArgs.mPassword.length());
-        copy(sArgs.mPassword.begin(), sArgs.mPassword.end(),
-             sCreateHsfArgs.mPassword.begin());
+        sCreateHsfArgs.mPassword = sArgs.mPassword;
 
         sCreateHsfArgs.mExpirationDate = sArgs.mExpirationDate;
 
