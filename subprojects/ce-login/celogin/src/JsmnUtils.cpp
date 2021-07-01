@@ -80,7 +80,7 @@ void JsmnUtils::PrintJsmnToken(const JsmnState& jsmnStateParm,
     }
     else
     {
-        printf("ERROR: Unable to print invalid JsmnToken %llu\n", tokenIdxParm);
+        printf("ERROR: Unable to print invalid JsmnToken %lu\n", tokenIdxParm);
     }
 }
 
