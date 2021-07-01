@@ -1,6 +1,8 @@
 #include "CliUtils.h"
 
-#include <cinttypes>
+#include <inttypes.h>
+#include <openssl/sha.h>
+
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -114,4 +116,28 @@ bool cli::getStringFromJson(json_object* jsonObjectParm,
         }
     }
     return sSuccess;
+}
+
+bool cli::createSha256PasswordHash(const std::string& passwordParm,
+                                   std::vector<uint8_t>& outputHashParm)
+{
+    if (passwordParm.empty())
+    {
+        return false;
+    }
+
+    std::vector<uint8_t> sSha256Digest(SHA512_DIGEST_LENGTH);
+    uint8_t* sHashResult = SHA512((const uint8_t*)passwordParm.c_str(),
+                                  passwordParm.length(), sSha256Digest.data());
+
+    if (sSha256Digest.data() == sHashResult)
+    {
+        outputHashParm = sSha256Digest;
+    }
+    else
+    {
+        return false;
+    }
+
+    return true;
 }

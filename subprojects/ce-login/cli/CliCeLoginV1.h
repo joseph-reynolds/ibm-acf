@@ -28,6 +28,12 @@ struct DecodedMachine
     std::string mFrameworkEc;
 };
 
+enum PasswordHashAlgorithm
+{
+    PasswordHash_Production,
+    PasswordHash_SHA512,
+};
+
 struct CeLoginCreateHsfArgsV1
 {
     std::string mSourceFileName;
@@ -35,6 +41,7 @@ struct CeLoginCreateHsfArgsV1
     std::string mExpirationDate;
     std::string mRequestId;
     std::string mPassword;
+    PasswordHashAlgorithm mPasswordHashAlgorithm;
     std::vector<uint8_t> mPrivateKey;
 };
 

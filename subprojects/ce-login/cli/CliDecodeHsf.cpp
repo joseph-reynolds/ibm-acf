@@ -7,7 +7,7 @@
 #include <getopt.h>
 #include <string.h>
 
-#include <cinttypes>
+#include <inttypes.h>
 #include <fstream>
 #include <iostream>
 #include <sstream>

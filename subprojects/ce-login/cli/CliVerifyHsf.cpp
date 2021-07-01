@@ -6,7 +6,7 @@
 #include <getopt.h>
 #include <string.h>
 
-#include <cinttypes>
+#include <inttypes.h>
 #include <ctime>
 #include <fstream>
 #include <iostream>

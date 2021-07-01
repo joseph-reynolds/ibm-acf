@@ -5,9 +5,9 @@
 
 #include <CeLogin.h>
 #include <getopt.h>
+#include <inttypes.h>
 #include <string.h>
 
-#include <cinttypes>
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -25,6 +25,7 @@ struct CreateArguments
     string mRequestId;
     string mPrivateKeyFile;
     string mOutputFile;
+    string mPasswordHashAlgorithm;
     bool mVerbose;
     bool mHelp;
     CreateArguments() : mVerbose(false), mHelp(false)
@@ -40,6 +41,7 @@ enum CreateOptOptions
     RequestId,
     PrivateKeyFile,
     OutputFile,
+    PasswordHashAlgorithm,
     Help,
     Verbose,
     NOptOptions
@@ -53,6 +55,7 @@ struct option create_long_options[NOptOptions + 1] = {
     {"requestId", required_argument, NULL, 'i'},
     {"pkey", required_argument, NULL, 'k'},
     {"output", required_argument, NULL, 'o'},
+    {"algorithm", required_argument, NULL, 'a'},
     {"help", no_argument, NULL, 'h'},
     {"verbose", no_argument, NULL, 'v'},
     {0, 0, 0, 0}};
@@ -61,8 +64,8 @@ string create_options_description[NOptOptions] = {
     "SourceFileName", "<processor gen>,<authority>,<serial number>",
     "Password",       "ExpirationDate",
     "RequestId",      "PrivateKeyFile",
-    "OutputFile",     "Help",
-    "Verbose"};
+    "OutputFile",     "<sha512|prod> - Password Hash Algorithm",
+    "Help",           "Verbose"};
 
 bool parseMachineFromString(const string& stringParm,
                             CeLogin::Machine& machineParm)
@@ -133,76 +136,66 @@ void createParseArgs(int argc, char** argv, struct CreateArguments& args)
                         &option_index);
         if (c == -1)
             break;
-        switch (c)
+        if (c == create_long_options[SourceFileName].val)
         {
-            case 'f':
+            sNumOfRequiredArgumentsFound++;
+            args.mSourceFileName = optarg;
+        }
+        else if (c == create_long_options[Machine].val)
+        {
+            sNumOfRequiredArgumentsFound++;
+            // Expected format: <processor gen>,<authority>,<serial number>
+            // Example: P10,Dev,12345
+            string sArg = optarg;
+            // Count the number of delimiters, should be 2
+            CeLogin::Machine sMachine;
+            if (parseMachineFromString(sArg, sMachine))
             {
-                sNumOfRequiredArgumentsFound++;
-                args.mSourceFileName = optarg;
-                break;
+                args.mMachines.push_back(sMachine);
             }
-            case 'm':
+            else
             {
-                sNumOfRequiredArgumentsFound++;
-                // Expected format: <processor gen>,<authority>,<serial number>
-                // Example: P10,Dev,12345
-                string sArg = optarg;
-                // Count the number of delimiters, should be 2
-                CeLogin::Machine sMachine;
-                if (parseMachineFromString(sArg, sMachine))
-                {
-                    args.mMachines.push_back(sMachine);
-                }
-                else
-                {
-                    cout << "ERROR: Unexpected string for machine type: \""
-                         << sArg << "\"" << endl;
-                }
-                break;
+                cout << "ERROR: Unexpected string for machine type: \"" << sArg
+                     << "\"" << endl;
             }
-            case 'p':
-            {
-                sNumOfRequiredArgumentsFound++;
-                args.mPassword = optarg;
-                break;
-            }
-            case 'e':
-            {
-                sNumOfRequiredArgumentsFound++;
-                args.mExpirationDate = optarg;
-                break;
-            }
-            case 'i':
-            {
-                sNumOfRequiredArgumentsFound++;
-                args.mRequestId = optarg;
-                break;
-            }
-            case 'k':
-            {
-                sNumOfRequiredArgumentsFound++;
-                args.mPrivateKeyFile = optarg;
-                break;
-            }
-            case 'o':
-            {
-                sNumOfRequiredArgumentsFound++;
-                args.mOutputFile = optarg;
-                break;
-            }
-            case 'h':
-            {
-                args.mHelp = true;
-                break;
-            }
-            case 'v':
-            {
-                args.mVerbose = true;
-                break;
-            }
-            default:
-            {
-            }
+        }
+        else if (c == create_long_options[Password].val)
+        {
+            sNumOfRequiredArgumentsFound++;
+            args.mPassword = optarg;
+        }
+        else if (c == create_long_options[ExpirationDate].val)
+        {
+            sNumOfRequiredArgumentsFound++;
+            args.mExpirationDate = optarg;
+        }
+        else if (c == create_long_options[RequestId].val)
+        {
+            sNumOfRequiredArgumentsFound++;
+            args.mRequestId = optarg;
+        }
+        else if (c == create_long_options[PrivateKeyFile].val)
+        {
+            sNumOfRequiredArgumentsFound++;
+            args.mPrivateKeyFile = optarg;
+        }
+        else if (c == create_long_options[OutputFile].val)
+        {
+            sNumOfRequiredArgumentsFound++;
+            args.mOutputFile = optarg;
+        }
+        else if (c == create_long_options[PasswordHashAlgorithm].val)
+        {
+            sNumOfRequiredArgumentsFound++;
+            args.mPasswordHashAlgorithm = optarg;
+        }
+        else if (c == create_long_options[Help].val)
+        {
+            args.mHelp = true;
+        }
+        else if (c == create_long_options[Verbose].val)
+        {
+            args.mVerbose = true;
         }
     }
 }
@@ -301,6 +294,27 @@ bool cli::createHsf(int argc, char** argv)
         if (readBinaryFile(string(sArgs.mPrivateKeyFile), sKey))
         {
             sCreateHsfArgs.mPrivateKey = sKey;
+        }
+
+        if (sArgs.mPasswordHashAlgorithm.empty())
+        {
+            sCreateHsfArgs.mPasswordHashAlgorithm =
+                CeLogin::PasswordHash_Production;
+        }
+        else if (0 == sArgs.mPasswordHashAlgorithm.compare("prod"))
+        {
+            sCreateHsfArgs.mPasswordHashAlgorithm =
+                CeLogin::PasswordHash_Production;
+        }
+        else if (0 == sArgs.mPasswordHashAlgorithm.compare("sha512"))
+        {
+            sCreateHsfArgs.mPasswordHashAlgorithm =
+                CeLogin::PasswordHash_SHA512;
+        }
+        else
+        {
+            cout << "ERROR: Unrecognized password hash algorithm" << endl;
+            return false;
         }
 
         vector<uint8_t> sAcfBinary;
