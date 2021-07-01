@@ -44,19 +44,18 @@ ninja -C build
 #### Step 3. Generate the ACF
 First get the serial number of the machine you would like to generate the ACF for.
 
-The value can be retrieved from BMC's web interface as such:
-Overview page > Server information > Serial number
+The value can be retrieved from BMC's web interface as such:\
+Overview page > Server information > Serial number\
 The value can also be retrieved from the BMC shell with the following command:
 ```
 busctl get-property xyz.openbmc_project.Inventory.Manager /xyz/openbmc_project/inventory/system xyz.openbmc_project.Inventory.Decorator.Asset SerialNumber
 ```
 
- - The --serialNumber argument can either be "UNSET" or the serial number fetched from the BMC
+The --serialNumber argument can either be "UNSET" or the serial number fetched from the BMC\
 ```
 ./build/celogin_cli create --processingType "P" --sourceFileName "none" --serialNumber "UNSET" \
                      --frameworkEc "PWR10D " --password "0penBmc" --expirationDate "2025-12-25" \
                      --requestId "1234" --pkey ./rsaprivkey.der --output ./ACFFile.bin --verbose
-
 ```
 
 #### Step 4. Upload ACF and Pubkey to BMC

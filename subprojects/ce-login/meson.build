@@ -47,13 +47,13 @@ endif
 idir = include_directories(['celogin/include', './cli', 'celogin/src', './jsmn'])
 
 if get_option('static')
-  ce_login_a = static_library('celogin', cpp_args : args + ['-fPIC'], sources : ce_login_sources, dependencies : deps, soversion : '0', include_directories : idir, install : true,)
+  ce_login_a = static_library('celogin', cpp_args : args + ['-fPIC'], sources : ce_login_sources, dependencies : deps, soversion : '0', include_directories : idir, install : true)
   lib_ce_login_dep = declare_dependency( include_directories : [idir] , link_with : ce_login_a)
 endif
 
 if get_option('so')
-  install_headers(['include/CeLogin/CeLogin.h'], install_dir : 'include/CeLogin' )
-  shared_library('celogin', cpp_args : args + ['-fPIC'], sources : srcs, dependencies : ce_login_sources, soversion : '0', include_directories : idir, install : true,)
+  install_headers(['celogin/include/CeLogin.h'], install_dir : 'include/celogin' )
+  shared_library('celogin', cpp_args : args + ['-fPIC'], sources : srcs, dependencies : ce_login_sources, soversion : '0', include_directories : idir, install : true)
 endif
 
 if get_option('bin')
