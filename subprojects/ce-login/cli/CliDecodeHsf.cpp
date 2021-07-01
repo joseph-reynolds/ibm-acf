@@ -1,21 +1,20 @@
 
+#include "CeLoginCli.h"
+#include "CliCeLoginV1.h"
+#include "CliUtils.h"
+
+#include <CeLogin.h>
+#include <getopt.h>
+#include <string.h>
+
+#include <cinttypes>
+#include <fstream>
 #include <iostream>
 #include <sstream>
 #include <string>
-#include <string.h>
-#include <getopt.h>
-#include <fstream>
-
-#include <cinttypes>
-
-#include <CeLogin.h>
-#include "CliCeLoginV1.h"
-
-#include "CliUtils.h"
-
-#include "CeLoginCli.h"
 
 using namespace CeLogin;
+using namespace std;
 
 struct DecodeArguments
 {
@@ -42,43 +41,37 @@ enum DecodeOptOptions
 };
 
 struct option decode_long_options[NOptOptions + 1] = {
-    {"hsfFile",        required_argument, NULL, 'i'},
-    {"publicKeyFile",  required_argument, NULL, 'k'},
-    {"help",           no_argument,       NULL, 'h'},
-    {"verbose",        no_argument,       NULL, 'v'},
-    {0,                0,                 0,     0}
-};
+    {"hsfFile", required_argument, NULL, 'i'},
+    {"publicKeyFile", required_argument, NULL, 'k'},
+    {"help", no_argument, NULL, 'h'},
+    {"verbose", no_argument, NULL, 'v'},
+    {0, 0, 0, 0}};
 
-std::string decode_options_description[NOptOptions] =
-{
-    "HsfFile",
-    "PublicKeyFile",
-    "Help",
-    "Verbose"
-};
-
+string decode_options_description[NOptOptions] = {"HsfFile", "PublicKeyFile",
+                                                  "Help", "Verbose"};
 
 void decodeParseArgs(int argc, char** argv, struct DecodeArguments& args)
 {
-    std::string short_options = "";
+    string short_options = "";
 
-    for(int i = 0; i < NOptOptions; i++)
+    for (int i = 0; i < NOptOptions; i++)
     {
         short_options += decode_long_options[i].val;
-        if(required_argument == decode_long_options[i].has_arg)
+        if (required_argument == decode_long_options[i].has_arg)
         {
             short_options += ":";
         }
     }
 
     int c;
-    int digit_optind = 0;
     int sNumOfRequiredArgumentsFound = 0;
-    while(1)
+    while (1)
     {
         int option_index = 0;
-        c = getopt_long(argc, argv, short_options.c_str(), decode_long_options, &option_index);
-        if (c == -1) break;
+        c = getopt_long(argc, argv, short_options.c_str(), decode_long_options,
+                        &option_index);
+        if (c == -1)
+            break;
         switch (c)
         {
             case 'i':
@@ -114,50 +107,60 @@ void decodePrintHelp(int argc, char** argv)
 {
     // Find the longest option
     size_t sLongestOpt = 0;
-    for(unsigned int i = 0; i < NOptOptions; i++)
+    for (unsigned int i = 0; i < NOptOptions; i++)
     {
         size_t sLength = strlen(decode_long_options[i].name);
-        sLongestOpt = std::max<size_t>(sLongestOpt, sLength);
+        sLongestOpt = max<size_t>(sLongestOpt, sLength);
     }
 
-    std::cout << "Usage: " << argv[0] << " " << argv[1] << std::endl;
-    for(unsigned int i = 0; i < NOptOptions; i++)
+    cout << "Usage: " << argv[0] << " " << argv[1] << endl;
+    for (unsigned int i = 0; i < NOptOptions; i++)
     {
         size_t sLength = strlen(decode_long_options[i].name);
-        std::cout << "\t-" << (char)decode_long_options[i].val << " --" << decode_long_options[i].name;
-        for(size_t j = 0; j < (sLongestOpt - sLength); j++)
+        cout << "\t-" << (char)decode_long_options[i].val << " --"
+             << decode_long_options[i].name;
+        for (size_t j = 0; j < (sLongestOpt - sLength); j++)
         {
-            std::cout << " ";
+            cout << " ";
         }
-        std::cout << " | " << decode_options_description[i] << std::endl;
+        cout << " | " << decode_options_description[i] << endl;
     }
 }
 
 bool decodeValidateArgs(const DecodeArguments& args)
 {
     bool sIsValidArgs = true;
-    if(NULL == args.mHsfFileName)
+    if (NULL == args.mHsfFileName)
     {
         sIsValidArgs = false;
-        std::cout << "Error: Missing HsfFileName" << std::endl;
+        cout << "Error: Missing HsfFileName" << endl;
     }
     return sIsValidArgs;
 }
 
 void printDecodedHsf(const CeLogin::CeLoginDecryptedHsfArgsV1& hsfParm)
 {
-    std::cout << "{" << std::endl;
-    std::cout << "\tProcessingType:\t" << hsfParm.mProcessingType << std::endl;
-    std::cout << "\tSourceFileName:\t" << hsfParm.mSourceFileName << std::endl;
-    std::cout << "\tSourceFileData:" << std::endl;
-    std::cout << "\t{" << std::endl;
-    std::cout << "\t\tserialNumber:\t" << hsfParm.mSerialNumber << std::endl;
-    std::cout << "\t\tframeworkEc:\t" << hsfParm.mFrameworkEc << std::endl;
-    std::cout << "\t\thashedAuthCode:\t" << hsfParm.mPasswordHash << std::endl;
-    std::cout << "\t\texpiration:\t" << hsfParm.mExpirationDate << std::endl;
-    std::cout << "\t\trequestId:\t" << hsfParm.mRequestId << std::endl;
-    std::cout << "\t}" << std::endl;
-    std::cout << "}" << std::endl;
+    cout << "{" << endl;
+    cout << "\tProcessingType:\t" << hsfParm.mProcessingType << endl;
+    cout << "\tSourceFileName:\t" << hsfParm.mSourceFileName << endl;
+    cout << "\tSourceFileData:" << endl;
+    cout << "\t{" << endl;
+    cout << "\t\tmachines: [" << endl;
+    for (size_t sIdx = 0; sIdx < hsfParm.mMachines.size(); sIdx++)
+    {
+        cout << "\t\t\t{" << endl;
+        cout << "\t\t\t\tserialNumber:\t"
+             << hsfParm.mMachines[sIdx].mSerialNumber << endl;
+        cout << "\t\t\t\tframeworkEc:\t" << hsfParm.mMachines[sIdx].mFrameworkEc
+             << endl;
+        cout << "\t\t\t}" << endl;
+    }
+    cout << "\t\t]" << endl;
+    cout << "\t\thashedAuthCode:\t" << hsfParm.mPasswordHash << endl;
+    cout << "\t\texpiration:\t" << hsfParm.mExpirationDate << endl;
+    cout << "\t\trequestId:\t" << hsfParm.mRequestId << endl;
+    cout << "\t}" << endl;
+    cout << "}" << endl;
 }
 
 bool cli::decodeHsf(int argc, char** argv)
@@ -165,61 +168,59 @@ bool cli::decodeHsf(int argc, char** argv)
     DecodeArguments sArgs;
     decodeParseArgs(argc, argv, sArgs);
 
-
-    if(sArgs.mHelp)
+    if (sArgs.mHelp)
     {
         decodePrintHelp(argc, argv);
     }
-    else if(decodeValidateArgs(sArgs))
+    else if (decodeValidateArgs(sArgs))
     {
-        std::vector<uint8_t> sHsf;
-        if(readBinaryFile(sArgs.mHsfFileName, sHsf))
+        vector<uint8_t> sHsf;
+        if (readBinaryFile(sArgs.mHsfFileName, sHsf))
         {
-            if(sArgs.mPublicKeyFileName)
+            if (sArgs.mPublicKeyFileName)
             {
-                std::vector<uint8_t> sPublicKey;
-                if(readBinaryFile(sArgs.mPublicKeyFileName, sPublicKey))
+                vector<uint8_t> sPublicKey;
+                if (readBinaryFile(sArgs.mPublicKeyFileName, sPublicKey))
                 {
                     CeLogin::CeLoginDecryptedHsfArgsV1 sDecodedHsf;
-                    CeLogin::CeLoginRc sRc = CeLogin::decodeAndVerifyCeLoginHsfV1(sHsf,
-                                                                                             sPublicKey,
-                                                                                             sDecodedHsf);
-                    if(CeLoginRc::Success == sRc)
+                    CeLogin::CeLoginRc sRc =
+                        CeLogin::decodeAndVerifyCeLoginHsfV1(sHsf, sPublicKey,
+                                                             sDecodedHsf);
+                    if (CeLoginRc::Success == sRc)
                     {
                         printDecodedHsf(sDecodedHsf);
-                        std::cout << "Signature verified" << std::endl;
+                        cout << "Signature verified" << endl;
                     }
-                    else if(CeLoginRc::SignatureNotValid == sRc)
+                    else if (CeLoginRc::SignatureNotValid == sRc)
                     {
-                        std::cout << "Signature is not valid" << std::endl;
+                        cout << "Signature is not valid" << endl;
                     }
                     else
                     {
-                        std::cout << "Error: 0x" << std::hex << (int)sRc << std::endl;
+                        cout << "Error: 0x" << hex << (int)sRc << endl;
                     }
                 }
                 else
                 {
-                    std::cout << "ERROR: Unable to read public key file: \""<< sArgs.mPublicKeyFileName << "\"" << std::endl;
+                    cout << "ERROR: Unable to read public key file: \""
+                         << sArgs.mPublicKeyFileName << "\"" << endl;
                 }
             }
             else
             {
-                // Skip the signature validation step (should not be allowed on a system)
-                std::cout << "Insecure decode " << std::endl;
+                cout << "ERROR, provide public key file " << endl;
             }
         }
         else
         {
-            std::cout << "ERROR: Unable to read hsf file: \""<< sArgs.mHsfFileName << "\"" << std::endl;
+            cout << "ERROR: Unable to read hsf file: \"" << sArgs.mHsfFileName
+                 << "\"" << endl;
         }
-
     }
     else
     {
-        std::cout << "Args failed to validate" << std::endl;
+        cout << "Args failed to validate" << endl;
     }
-
 
     return false;
 }

@@ -17,6 +17,7 @@ ce_login_sources = ['celogin/src/CeLoginAsnV1.cpp',
                     'celogin/src/CeLoginJsonExterns.cpp',
                     'celogin/src/CeLoginUtil.cpp',
                     'celogin/src/JsmnUtils.cpp',
+                    'celogin/src/Jsmn.cpp',
                     'celogin/src/CeLoginAsnV1.cpp',
                     ]
 

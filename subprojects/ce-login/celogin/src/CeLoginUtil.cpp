@@ -1,36 +1,40 @@
 
-#include <openssl/asn1.h>
-#include <openssl/rsa.h>
-#include <openssl/x509.h>
-#include <openssl/crypto.h>
-#include <stdio.h> // sprintf
-#include <stdlib.h> // strtoul
-#include <string.h> // strstr, memcpy, bzero, strlen
-#include <CeLogin.h>
+#include "CeLoginUtil.h"
 
 #include "CeLoginJson.h"
 
-#include "CeLoginUtil.h"
+#include <CeLogin.h>
+#include <openssl/asn1.h>
+#include <openssl/crypto.h>
+#include <openssl/rsa.h>
+#include <openssl/x509.h>
+#include <stdio.h>  // sprintf
+#include <stdlib.h> // strtoul
+#include <string.h> // strstr, memcpy, bzero, strlen
 
-/// TODO: rtc 268075 Determine if openssl can provide this function. If it can, use that instead.
-CeLogin::CeLoginRc CeLogin::getBinaryFromHex(const char* hexStringParm, const uint64_t hexStringLengthParm,
-                                             uint8_t* binaryParm, const uint64_t binarySizeParm,
+/// TODO: rtc 268075 Determine if openssl can provide this function. If it can,
+/// use that instead.
+CeLogin::CeLoginRc CeLogin::getBinaryFromHex(const char* hexStringParm,
+                                             const uint64_t hexStringLengthParm,
+                                             uint8_t* binaryParm,
+                                             const uint64_t binarySizeParm,
                                              uint64_t& binaryLengthParm)
 {
     CeLoginRc sRc = CeLoginRc::Success;
     binaryLengthParm = 0;
-    if(hexStringParm && binaryParm && hexStringLengthParm <= (2 * binarySizeParm)
-        && 0 == hexStringLengthParm % 2)
+    if (hexStringParm && binaryParm &&
+        hexStringLengthParm <= (2 * binarySizeParm) &&
+        0 == hexStringLengthParm % 2)
     {
-        for(uint64_t sIdx = 0; sIdx < hexStringLengthParm; sIdx += 2)
+        for (uint64_t sIdx = 0; sIdx < hexStringLengthParm; sIdx += 2)
         {
             char sByteHexString[3];
             memcpy(sByteHexString, &hexStringParm[sIdx], 2);
             sByteHexString[2] = '\0';
             unsigned long int sVal = strtoul(sByteHexString, NULL, 16);
-            if(sVal <= 0xFF)
+            if (sVal <= 0xFF)
             {
-                binaryParm[sIdx/2] = sVal;
+                binaryParm[sIdx / 2] = sVal;
                 binaryLengthParm++;
             }
             else
@@ -47,13 +51,15 @@ CeLogin::CeLoginRc CeLogin::getBinaryFromHex(const char* hexStringParm, const ui
     return sRc;
 }
 
-CeLogin::CeLoginRc CeLogin::getDateFromString(const char* dateStringParm, const uint64_t dateStringLengthParm,
-                                              CeLogin::CeLogin_Date& dateParm)
+CeLogin::CeLoginRc
+    CeLogin::getDateFromString(const char* dateStringParm,
+                               const uint64_t dateStringLengthParm,
+                               CeLogin::CeLogin_Date& dateParm)
 {
     CeLoginRc sRc = CeLoginRc::Success;
-    if(dateStringParm && strlen("yyyy-mm-dd") == dateStringLengthParm)
+    if (dateStringParm && strlen("yyyy-mm-dd") == dateStringLengthParm)
     {
-        if('-' == dateStringParm[4] && '-' == dateStringParm[7])
+        if ('-' == dateStringParm[4] && '-' == dateStringParm[7])
         {
             char year[5];
             char month[3];
@@ -70,7 +76,7 @@ CeLogin::CeLoginRc CeLogin::getDateFromString(const char* dateStringParm, const 
             dateParm.mMonth = strtoul(month, NULL, 10);
             dateParm.mDay = strtoul(day, NULL, 10);
 
-            if(dateParm.mYear > 0 && dateParm.mMonth > 0 && dateParm.mDay > 0)
+            if (dateParm.mYear > 0 && dateParm.mMonth > 0 && dateParm.mDay > 0)
             {
                 sRc = CeLoginRc::Success;
             }
@@ -92,14 +98,15 @@ CeLogin::CeLoginRc CeLogin::getDateFromString(const char* dateStringParm, const 
     return sRc;
 }
 
-CeLogin::CeLoginRc CeLogin::getAsn1Time(const CeLogin::CeLogin_Date& dateParm, ASN1_TIME* timeParm)
+CeLogin::CeLoginRc CeLogin::getAsn1Time(const CeLogin::CeLogin_Date& dateParm,
+                                        ASN1_TIME* timeParm)
 {
     // ASN1 Time Strings are in the form YYYYMMDDHHMMSSZ defined by RFC 5280
     // For example 20210113000102Z would be:
     // 01/13/2021 00:01:02 Zulu (i.e. GMT)
     CeLoginRc sRc = CeLoginRc::Success;
 
-    if(timeParm)
+    if (timeParm)
     {
         char sTimeStr[16];
 
@@ -107,12 +114,13 @@ CeLogin::CeLoginRc CeLogin::getAsn1Time(const CeLogin::CeLogin_Date& dateParm, A
         const uint8_t sMin = 0;
         const uint8_t sSec = 0;
 
-        int sLength = sprintf(sTimeStr, "%04u%02u%02u%02u%02u%02uZ",
-                              dateParm.mYear, dateParm.mMonth, dateParm.mDay, sHour, sMin, sSec);
-        if(15 == sLength)
+        int sLength =
+            sprintf(sTimeStr, "%04u%02u%02u%02u%02u%02uZ", dateParm.mYear,
+                    dateParm.mMonth, dateParm.mDay, sHour, sMin, sSec);
+        if (15 == sLength)
         {
             // returns 1 if the time value is successfully set and 0 otherwise
-            if(1 != ASN1_TIME_set_string(timeParm, sTimeStr))
+            if (1 != ASN1_TIME_set_string(timeParm, sTimeStr))
             {
                 sRc = CeLoginRc::GetAsn1Time_SetStringFailure;
             }
@@ -129,9 +137,10 @@ CeLogin::CeLoginRc CeLogin::getAsn1Time(const CeLogin::CeLogin_Date& dateParm, A
     return sRc;
 }
 
-CeLogin::CeLoginRc CeLogin::decodeAndVerifyAcf(const uint8_t* accessControlFileParm, const uint64_t accessControlFileLengthParm,
-                                               const uint8_t* publicKeyParm, uint64_t publicKeyLengthParm,
-                                               CeLogin::CELoginSequenceV1*& decodedAsnParm)
+CeLogin::CeLoginRc CeLogin::decodeAndVerifyAcf(
+    const uint8_t* accessControlFileParm,
+    const uint64_t accessControlFileLengthParm, const uint8_t* publicKeyParm,
+    uint64_t publicKeyLengthParm, CeLogin::CELoginSequenceV1*& decodedAsnParm)
 {
     CeLoginRc sRc = CeLoginRc::Success;
 
@@ -140,90 +149,94 @@ CeLogin::CeLoginRc CeLogin::decodeAndVerifyAcf(const uint8_t* accessControlFileP
 
     ASN1_OBJECT* sExpectedObject = NULL;
 
-    if(!accessControlFileParm || !publicKeyParm)
+    if (!accessControlFileParm || !publicKeyParm)
     {
         sRc = CeLoginRc::VerifyAcf_InvalidParm;
     }
 
-    if(CeLoginRc::Success == sRc)
+    if (CeLoginRc::Success == sRc)
     {
-        // Returns pointer to a static definition of the object identifier. Returns NULL on failure.
+        // Returns pointer to a static definition of the object identifier.
+        // Returns NULL on failure.
         sExpectedObject = OBJ_nid2obj(CeLogin_Acf_NID);
-        if(!sExpectedObject)
+        if (!sExpectedObject)
         {
             sRc = CeLoginRc::VerifyAcf_Nid2OidFailed;
         }
     }
 
-    if(CeLoginRc::Success == sRc)
+    if (CeLoginRc::Success == sRc)
     {
         // return a valid TYPE structure or NULL if an error occurs
-        // NOTE: there is a "reuse" capability where an existing structure can be provided,
-        //       however in the event of a failure, the structure is automatically free'd.
-        //       Either way there is undesirable behavior. So in this case returning a heap
-        //       allocation seems slightly more straightforward.
-        decodedAsnParm = d2i_CELoginSequenceV1(NULL, &accessControlFileParm, accessControlFileLengthParm);
-        if(!decodedAsnParm)
+        // NOTE: there is a "reuse" capability where an existing structure can
+        // be provided,
+        //       however in the event of a failure, the structure is
+        //       automatically free'd. Either way there is undesirable behavior.
+        //       So in this case returning a heap allocation seems slightly more
+        //       straightforward.
+        decodedAsnParm = d2i_CELoginSequenceV1(NULL, &accessControlFileParm,
+                                               accessControlFileLengthParm);
+        if (!decodedAsnParm)
         {
             sRc = CeLoginRc::VerifyAcf_AsnDecodeFailure;
         }
     }
 
     // Verify supported OID/signature algorithm
-    if(CeLoginRc::Success == sRc)
+    if (CeLoginRc::Success == sRc)
     {
         // If the two are identical 0 is returned
-        if(0 != OBJ_cmp(sExpectedObject, decodedAsnParm->algorithm->id))
+        if (0 != OBJ_cmp(sExpectedObject, decodedAsnParm->algorithm->id))
         {
             sRc = CeLoginRc::VerifyAcf_OidMismatchFailure;
         }
     }
 
     // Verify expected ProcessingType
-    if(CeLoginRc::Success == sRc)
+    if (CeLoginRc::Success == sRc)
     {
         const uint64_t sProcessingTypeLength = strlen(AcfProcessingType);
-        if(sProcessingTypeLength != decodedAsnParm->processingType->length
-            || memcmp(AcfProcessingType, decodedAsnParm->processingType->data, sProcessingTypeLength))
+        if (sProcessingTypeLength != decodedAsnParm->processingType->length ||
+            memcmp(AcfProcessingType, decodedAsnParm->processingType->data,
+                   sProcessingTypeLength))
         {
             sRc = CeLoginRc::VerifyAcf_ProcessingTypeMismatch;
         }
     }
 
-    if(CeLoginRc::Success == sRc)
+    if (CeLoginRc::Success == sRc)
     {
         // returns a pointer to the hash value on success, NULL on failure
         sRc = createDigest(decodedAsnParm->sourceFileData->data,
                            decodedAsnParm->sourceFileData->length,
-                           sHashReceivedJson,
-                           sizeof(sHashReceivedJson));
+                           sHashReceivedJson, sizeof(sHashReceivedJson));
     }
 
-    if(CeLoginRc::Success == sRc)
+    if (CeLoginRc::Success == sRc)
     {
         // return a valid RSA structure or NULL if an error occurs.
         sPublicKey = d2i_RSA_PUBKEY(NULL, &publicKeyParm, publicKeyLengthParm);
-        if(!sPublicKey)
+        if (!sPublicKey)
         {
             sRc = CeLoginRc::VerifyAcf_PublicKeyImportFailure;
         }
     }
 
     // Verify signature over SourceFileData
-    if(CeLoginRc::Success == sRc)
+    if (CeLoginRc::Success == sRc)
     {
         // returns 1 on successful verification
-        int sRsaResult = RSA_verify(CeLogin_Acf_NID,
-                                    sHashReceivedJson, sizeof(sHashReceivedJson),
-                                    decodedAsnParm->signature->data, decodedAsnParm->signature->length,
-                                    sPublicKey);
-        if(1 != sRsaResult)
+        int sRsaResult = RSA_verify(
+            CeLogin_Acf_NID, sHashReceivedJson, sizeof(sHashReceivedJson),
+            decodedAsnParm->signature->data, decodedAsnParm->signature->length,
+            sPublicKey);
+        if (1 != sRsaResult)
         {
             sRc = CeLoginRc::SignatureNotValid;
         }
     }
 
-    if(sPublicKey)
+    if (sPublicKey)
     {
         RSA_free(sPublicKey);
     }
@@ -231,33 +244,34 @@ CeLogin::CeLoginRc CeLogin::decodeAndVerifyAcf(const uint8_t* accessControlFileP
     return sRc;
 }
 
-CeLogin::CeLoginRc CeLogin::createDigest(const uint8_t* inputDataParm, const uint64_t inputDataLengthParm,
-                                         uint8_t* outputHashParm, const uint64_t outputHashSizeParm)
+CeLogin::CeLoginRc CeLogin::createDigest(const uint8_t* inputDataParm,
+                                         const uint64_t inputDataLengthParm,
+                                         uint8_t* outputHashParm,
+                                         const uint64_t outputHashSizeParm)
 {
     CeLoginRc sRc = CeLoginRc::Success;
-    if(!inputDataParm)
+    if (!inputDataParm)
     {
         sRc = CeLoginRc::CreateDigest_InvalidInputBuffer;
     }
-    else if(inputDataLengthParm <= 0)
+    else if (inputDataLengthParm <= 0)
     {
         sRc = CeLoginRc::CreateDigest_InvalidInputBufferLength;
     }
-    else if(!outputHashParm)
+    else if (!outputHashParm)
     {
         sRc = CeLoginRc::CreateDigest_InvalidOutputBuffer;
     }
-    else if(outputHashSizeParm < CeLogin_DigestLength)
+    else if (outputHashSizeParm < CeLogin_DigestLength)
     {
         sRc = CeLoginRc::CreateDigest_InvalidOutputBufferLength;
     }
     else
     {
-        uint8_t* sHashResult = SHA512(inputDataParm,
-                                    inputDataLengthParm,
-                                    outputHashParm);
+        uint8_t* sHashResult =
+            SHA512(inputDataParm, inputDataLengthParm, outputHashParm);
 
-        if(outputHashParm != sHashResult)
+        if (outputHashParm != sHashResult)
         {
             sRc = CeLoginRc::CreateDigest_OsslCallFailed;
         }
@@ -265,33 +279,34 @@ CeLogin::CeLoginRc CeLogin::createDigest(const uint8_t* inputDataParm, const uin
     return sRc;
 }
 
-CeLogin::CeLoginRc CeLogin::createPasswordHash(const uint8_t* inputDataParm, const uint64_t inputDataLengthParm,
-                                               uint8_t* outputHashParm, const uint64_t outputHashSizeParm)
+CeLogin::CeLoginRc CeLogin::createPasswordHash(
+    const char* inputDataParm, const uint64_t inputDataLengthParm,
+    uint8_t* outputHashParm, const uint64_t outputHashSizeParm)
 {
     CeLoginRc sRc = CeLoginRc::Success;
-    if(!inputDataParm)
+    if (!inputDataParm)
     {
         sRc = CeLoginRc::CreatePasswordHash_InvalidInputBuffer;
     }
-    else if(0 == inputDataLengthParm)
+    else if (0 == inputDataLengthParm)
     {
         sRc = CeLoginRc::CreatePasswordHash_InvalidInputBufferLength;
     }
-    else if(!outputHashParm)
+    else if (!outputHashParm)
     {
         sRc = CeLoginRc::CreatePasswordHash_InvalidOutputBuffer;
     }
-    else if(outputHashSizeParm < CeLogin_PasswordHashLength)
+    else if (outputHashSizeParm < CeLogin_PasswordHashLength)
     {
         sRc = CeLoginRc::CreatePasswordHash_InvalidOutputBufferLength;
     }
     else
     {
-        uint8_t* sHashResult = SHA512(inputDataParm,
-                                    inputDataLengthParm,
-                                    outputHashParm);
+        // Cast const char* to const uint8_t*
+        uint8_t* sHashResult = SHA512((const uint8_t*)inputDataParm,
+                                      inputDataLengthParm, outputHashParm);
 
-        if(outputHashParm != sHashResult)
+        if (outputHashParm != sHashResult)
         {
             sRc = CeLoginRc::CreatePasswordHash_OsslCallFailed;
         }
@@ -299,37 +314,38 @@ CeLogin::CeLoginRc CeLogin::createPasswordHash(const uint8_t* inputDataParm, con
     return sRc;
 }
 
-CeLogin::CeLoginRc CeLogin::getUnsignedIntegerFromString(const char* stringParm,
-                                                         const uint64_t stringLengthParm,
-                                                         uint64_t& integerParm)
+CeLogin::CeLoginRc
+    CeLogin::getUnsignedIntegerFromString(const char* stringParm,
+                                          const uint64_t stringLengthParm,
+                                          uint64_t& integerParm)
 {
     const uint64_t sMaxLength = 10; // Well below the maximum value of a uint64
     CeLoginRc sRc = CeLoginRc::Success;
 
-    if(!stringParm)
+    if (!stringParm)
     {
         sRc = CeLoginRc::GetUnsignedIntFromString_InvalidBuffer;
     }
-    else if(0 == stringLengthParm)
+    else if (0 == stringLengthParm)
     {
         sRc = CeLoginRc::GetUnsignedIntFromString_ZeroLengthBuffer;
     }
-    else if(stringLengthParm > sMaxLength)
+    else if (stringLengthParm > sMaxLength)
     {
         sRc = CeLoginRc::GetUnsignedIntFromString_IntegerOverflow;
     }
     else
     {
-        // Since strtoul will allow "extra" whitespace, sanitize the string to make sure it conforms
-        // to an integer (and only an integer). Since we want an unsigned integer we can also reject
-        // negative numbers.
+        // Since strtoul will allow "extra" whitespace, sanitize the string to
+        // make sure it conforms to an integer (and only an integer). Since we
+        // want an unsigned integer we can also reject negative numbers.
         bool sIsValid = true;
-        for(uint64_t sIdx = 0; sIdx < stringLengthParm && sIsValid; sIdx++)
+        for (uint64_t sIdx = 0; sIdx < stringLengthParm && sIsValid; sIdx++)
         {
             sIsValid = (stringParm[sIdx] >= '0' && stringParm[sIdx] <= '9');
         }
 
-        if(sIsValid)
+        if (sIsValid)
         {
             char sNullTermString[sMaxLength + 1];
             memset(sNullTermString, 0, sizeof(sNullTermString));
@@ -344,27 +360,28 @@ CeLogin::CeLoginRc CeLogin::getUnsignedIntegerFromString(const char* stringParm,
     return sRc;
 }
 
-CeLogin::CeLoginRc CeLogin::getServiceAuthorityFromFrameworkEc(const char* frameworkEcParm,
-                                                               const uint64_t frameworkEcLengthParm,
-                                                               ServiceAuthority& authParm)
+CeLogin::CeLoginRc CeLogin::getServiceAuthorityFromFrameworkEc(
+    const char* frameworkEcParm, const uint64_t frameworkEcLengthParm,
+    ServiceAuthority& authParm)
 {
     CeLoginRc sRc = CeLoginRc::Success;
     authParm = ServiceAuth_None;
 
-    if(!frameworkEcParm
-        || 0 == frameworkEcLengthParm)
+    if (!frameworkEcParm || 0 == frameworkEcLengthParm)
     {
         sRc = CeLoginRc::GetAuthFromFrameworkEc_InvalidParm;
     }
     else
     {
-        if(frameworkEcLengthParm == strlen(FrameworkEc_P10_Dev)
-            && 0 == memcmp(frameworkEcParm, FrameworkEc_P10_Dev, frameworkEcLengthParm))
+        if (frameworkEcLengthParm == strlen(FrameworkEc_P10_Dev) &&
+            0 == memcmp(frameworkEcParm, FrameworkEc_P10_Dev,
+                        frameworkEcLengthParm))
         {
             authParm = ServiceAuth_Dev;
         }
-        else if(frameworkEcLengthParm == strlen(FrameworkEc_P10_Service)
-            && 0 == memcmp(frameworkEcParm, FrameworkEc_P10_Service, frameworkEcLengthParm))
+        else if (frameworkEcLengthParm == strlen(FrameworkEc_P10_Service) &&
+                 0 == memcmp(frameworkEcParm, FrameworkEc_P10_Service,
+                             frameworkEcLengthParm))
         {
             authParm = ServiceAuth_CE;
         }
