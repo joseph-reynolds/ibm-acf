@@ -187,20 +187,20 @@ bool readBinaryFile(const std::string fileNameParm,
     return false;
 }
 
-int verifyACF(string acfPubKeypath, const char* password, string mSerialNumber,
+int verifyACF(string acfPubKeypath, const char* passwordParm, string mSerialNumber,
               pam_handle_t* pamh)
 {
     string acfFileName = (ACF_FILE_PATH);
     vector<uint8_t> sAcf;
     time_t sTime = time(NULL);
-    const uint8_t* passwordParm = (const uint8_t*)password;
-    const uint64_t passwordLengthParm = strlen(password);
+    const uint64_t passwordLengthParm = strlen(passwordParm);
     const uint64_t timeSinceUnixEpocInSecondsParm = sTime;
     vector<uint8_t> sPublicKey;
     const char* serialNumberParm = mSerialNumber.data();
     const uint64_t serialNumberLengthParm = mSerialNumber.size();
-    CeLogin::ServiceAuthority sAuth = CeLogin::ServiceAuth_Dev;
+    CeLogin::ServiceAuthority sAuth = CeLogin::ServiceAuth_None;
 
+    uint64_t sExpiration = 0;
     if (readBinaryFile(acfFileName, sAcf, pamh))
     {
         if (readBinaryFile(acfPubKeypath, sPublicKey, pamh))
@@ -210,12 +210,13 @@ int verifyACF(string acfPubKeypath, const char* password, string mSerialNumber,
 
             const uint8_t* accessControlFileParm = sAcf.data();
             const uint64_t accessControlFileLengthParm = sAcf.size();
+
             CeLogin::CeLoginRc sRc = CeLogin::getServiceAuthorityV1(
                 accessControlFileParm, accessControlFileLengthParm,
                 passwordParm, passwordLengthParm,
                 timeSinceUnixEpocInSecondsParm, publicKeyParm,
                 publicKeyLengthParm, serialNumberParm, serialNumberLengthParm,
-                sAuth);
+                sAuth, sExpiration);
             if (CeLoginRc::Success == sRc)
             {
                 return PAM_SUCCESS;
