@@ -271,7 +271,7 @@ CeLoginRc ParseAuthorityFromMachineArrayToken(
             const uint64_t sNumOfEntries = sTokenValue.size; // Array length
             uint64_t sCurIdx =
                 machineArrayTokenIdxParm + 1; // Next token is the first element
-            for (int sIdx = 0; sIdx < sNumOfEntries;
+            for (uint64_t sIdx = 0; sIdx < sNumOfEntries;
                  sIdx++) // Iterate over the array
             {
                 // It should be an array of objects. Each object contains a

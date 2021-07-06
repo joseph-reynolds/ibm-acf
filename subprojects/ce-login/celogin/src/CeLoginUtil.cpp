@@ -196,8 +196,8 @@ CeLogin::CeLoginRc CeLogin::decodeAndVerifyAcf(
     // Verify expected ProcessingType
     if (CeLoginRc::Success == sRc)
     {
-        const uint64_t sProcessingTypeLength = strlen(AcfProcessingType);
-        if (sProcessingTypeLength != decodedAsnParm->processingType->length ||
+        const size_t sProcessingTypeLength = strlen(AcfProcessingType);
+        if (sProcessingTypeLength != (size_t)decodedAsnParm->processingType->length ||
             memcmp(AcfProcessingType, decodedAsnParm->processingType->data,
                    sProcessingTypeLength))
         {
