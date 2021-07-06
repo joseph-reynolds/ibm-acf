@@ -10,7 +10,8 @@
 #include <openssl/x509.h>
 #include <stdio.h>  // sprintf
 #include <stdlib.h> // strtoul
-#include <string.h> // strstr, memcpy, bzero, strlen
+#include <string.h> // strstr, memcpy, strlen
+#include <strings.h> // bzero
 
 /// TODO: rtc 268075 Determine if openssl can provide this function. If it can,
 /// use that instead.
