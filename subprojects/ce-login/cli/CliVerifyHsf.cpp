@@ -171,10 +171,12 @@ bool verifyValidateArgs(const VerifyArguments& args)
     return sIsValidArgs;
 }
 
-bool cli::verifyHsf(int argc, char** argv)
+CeLogin::CeLoginRc cli::verifyHsf(int argc, char** argv)
 {
     VerifyArguments sArgs;
     verifyParseArgs(argc, argv, sArgs);
+
+    CeLogin::CeLoginRc sRc = CeLogin::CeLoginRc::Failure;
 
     if (sArgs.mHelp)
     {
@@ -192,7 +194,7 @@ bool cli::verifyHsf(int argc, char** argv)
                 CeLogin::ServiceAuthority sAuth = CeLogin::ServiceAuth_None;
                 uint64_t sExpiration;
 
-                CeLogin::CeLoginRc sRc = CeLogin::getServiceAuthorityV1(
+                sRc = CeLogin::getServiceAuthorityV1(
                     sHsf.data(), sHsf.size(), sArgs.mPassword.data(),
                     sArgs.mPassword.size(), sTime, sPublicKey.data(),
                     sPublicKey.size(), sArgs.mSerialNumber.data(),
@@ -260,5 +262,5 @@ bool cli::verifyHsf(int argc, char** argv)
         std::cout << "Args failed to validate" << std::endl;
     }
 
-    return false;
+    return sRc;
 }

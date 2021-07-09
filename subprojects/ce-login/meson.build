@@ -85,5 +85,61 @@ endif
 
 #Ce-login utility for generating access control files
 if get_option('bin')
-  build_target('celogin_cli', cpp_args : args, target_type : 'executable', sources : srcs, dependencies : deps, include_directories : idir)
+  exe = executable('celogin_cli', cpp_args : args, target_type : 'executable', sources : srcs, dependencies : deps, include_directories : idir)
+
+#Tests to run against celogin_cli creating ACF, validating, and decoding.
+#Priority is set for ordering of commands as some tests depend on each other,
+#eg the ACF should be created before validating it.
+#If priority is not defined then it is implicitly 0
+#and higher numbers are executed first
+
+  test('Generate ACF', exe, priority : 3, args : [ 'create',
+                                                   '--machine', 'P10,dev,UNSET',
+                                                   '--sourceFileName', 'none',
+                                                   '--password', '0penBmc1',
+                                                   '--expirationDate', '2025-12-25',
+                                                   '--requestId', '1234',
+                                                   '--pkey', '../p10-celogin-lab-pkey.der',
+                                                   '--output', './ACFFile.bin' ])
+
+  test('Verify ACF', exe, priority : 2, args : [ 'verify',
+                                                 '--hsfFile', './ACFFile.bin',
+                                                 '--publicKeyFile', '../p10-celogin-lab-pub.der',
+                                                 '--password', '0penBmc1',
+                                                 '--serialNumber', 'UNSET' ] )
+
+  test('Decode ACF', exe, priority : 1, args : [ 'decode',
+                                                 '--hsfFile', './ACFFile.bin',
+                                                 '--publicKeyFile', '../p10-celogin-lab-pub.der'])
+
+  test('Execute celogin_cli with no args', exe, should_fail : true)
+
+  test('Generate ACF - Malformed param', exe, priority : -100, should_fail : true,
+                                          args : [ 'create',
+                                                   '--machine', 'P10,dev,UNSET',
+                                                   '--sourceFileName', 'none',
+                                                   '--passwordBadArgument', '0penBmc1',
+                                                   '--expirationDate', '2025-12-25',
+                                                   '--requestId', '1234',
+                                                   '--pkey', '../p10-celogin-lab-pkey.der',
+                                                   '--output', './ACFFile.bin' ] )
+
+  test('Verify ACF - Incorrect Password', exe, priority : 1, should_fail : true,
+                                          args : [ 'verify',
+                                                   '--hsfFile', 'ACFFile.bin',
+                                                   '--publicKeyFile', '../p10-celogin-lab-pub.der',
+                                                   '--password', 'notthepassword',
+                                                   '--serialNumber', 'UNSET' ] )
+
+  test('Verify ACF - Incorrect Serial Number', exe, priority : 1, should_fail : true,
+                                          args : [ 'verify',
+                                                   '--hsfFile', 'ACFFile.bin',
+                                                   '--publicKeyFile', '../p10-celogin-lab-pub.der',
+                                                   '--password', 'notthepassword',
+                                                   '--serialNumber', '123123' ] )
+
+  test('Decode ACF - No pubkey', exe, should_fail : true,
+                                          args : [ 'decode',
+                                                   '--hsfFile', './ACFFile.bin',
+                                                   '--publicKeyFile', 'celogin_cli'])
 endif
