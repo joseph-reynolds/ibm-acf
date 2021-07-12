@@ -1,8 +1,35 @@
 project('ce-login', 'cpp',
   version : '1.0.0')
 
-libcrypto = dependency('libcrypto', required : true)
-libssl = dependency('libssl', required : true)
+cpp = meson.get_compiler('cpp')
+
+#Intended to be configured if this does not match your openssl include loc
+#Should not be required if package config is found for openssl though
+openssl_include_dir = '/usr/include/openssl'
+#Create a symbolic link in cwd to libcrypto/libssl directories to build
+#if pkgconfig and find_library calls fail
+cwd = meson.current_source_dir()
+
+libcrypto = dependency('libcrypto', required : false)
+if not libcrypto.found()
+  libcrypto = cpp.find_library('crypto', required : false )
+  if not libcrypto.found()
+    #Last resort to build with libcrypto
+    crypto_inc = include_directories ( openssl_include_dir )
+    libcrypto = declare_dependency( link_args : [ '-L' + cwd, '-lcrypto' ], include_directories : crypto_inc )
+  endif
+endif
+
+libssl = dependency('libssl', required : false)
+if not libssl.found()
+  libssl = cpp.find_library('ssl', required : false)
+  if not libssl.found()
+    #Last resort to build with libssl
+    crypto_inc = include_directories ( openssl_include_dir )
+    libssl = declare_dependency( link_args : [ '-L',  '-lssl' ], include_directories : crypto_inc )
+  endif
+endif
+
 ldl = declare_dependency( link_args : '-ldl' )
 #Needed for cli
 ljsonc = declare_dependency( link_args : '-ljson-c' )
@@ -56,6 +83,7 @@ if get_option('so')
   shared_library('celogin', cpp_args : args + ['-fPIC'], sources : srcs, dependencies : ce_login_sources, soversion : '0', include_directories : idir, install : true)
 endif
 
+#Ce-login utility for generating access control files
 if get_option('bin')
   build_target('celogin_cli', cpp_args : args, target_type : 'executable', sources : srcs, dependencies : deps, include_directories : idir)
 endif
