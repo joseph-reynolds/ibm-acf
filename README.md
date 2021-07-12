@@ -51,11 +51,16 @@ The value can also be retrieved from the BMC shell with the following command:
 busctl get-property xyz.openbmc_project.Inventory.Manager /xyz/openbmc_project/inventory/system xyz.openbmc_project.Inventory.Decorator.Asset SerialNumber
 ```
 
-The --serialNumber argument can either be "UNSET" or the serial number fetched from the BMC\
+The --machine argument can either be "x,x,UNSET" or the serial number fetched from the BMC "x,x,123454321"
 ```
-./build/celogin_cli create --processingType "P" --sourceFileName "none" --serialNumber "UNSET" \
-                     --frameworkEc "PWR10D " --password "0penBmc" --expirationDate "2025-12-25" \
-                     --requestId "1234" --pkey ./rsaprivkey.der --output ./ACFFile.bin --verbose
+./celogin_cli create \
+                --machine 'P10,dev,12345' \
+                --sourceFileName "none" \
+                --password "0penBmc123" \
+                --expirationDate "2025-12-25" \
+                --requestId "1234" \
+                --pkey ../p10-celogin-lab-pkey.der \
+                --output ./service.acf
 ```
 
 #### Step 4. Upload ACF and Pubkey to BMC
