@@ -2,7 +2,7 @@
 Access Control File functions
 
 ## This repository depends on the following libraries and should be installed on build machine:
-libpam, libssl, libsdplus, pthread
+libpam, libssl, libsdplus
 
 ## To build the ibm-acf pam module run these commands:
 ```
@@ -36,8 +36,7 @@ openssl rsa -in rsakeys.pem -outform DER -out rsaprivkey.der
 #### Step 2. Build the celogin_cli utility
 ```
 cd subprojects/ce-login
-meson setup build
-meson configure -Dso=false -Dstatic=false -Dbin=true build
+meson setup -Dlib=false -Dbin=true build
 ninja -C build
 ```
 

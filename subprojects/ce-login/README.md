@@ -1,32 +1,31 @@
 # ce-login
-Ce-Login depends on the following libraries and should be installed on build machine:\
-libcrypto, libssl, ldl, jsonc
+Ce-Login depends on the following libraries and should be installed on build machine:
+
+libcrypto, libssl, json-c (celogin_cli)
 
 To build the ce-login utility run these commands:
 ```
-meson setup build
-meson configure -Dso=false -Dstatic=false -Dbin=true build
+meson setup -Dlib=false -Dbin=true build
 ninja -C build
 ```
 
 There is support to build either the cli utility, static lib or shared lib.
 
-All these are controlled through the configuration options used above
+The options can be configured on setup or afterwards with the 'meson configure' command
 
 Set any of the options to 'true' to build desired target
 ```
-meson configure -Dso=[true | false] -Dstatic=[true | false] -Dbin=[true | false] build
+meson configure -Dlib=[true | false] -Dbin=[true | false] -Ddefault_library=[shared | static] build
 ```
 Default configuration is:
 ```
--Dso=false -Dstatic=true -Dbin=false
+-Dlib=true -Dbin=false -Ddefault_library=static
 ```
 As defined by meson_options.txt
 
 Running unit tests:
 ```
-meson setup build
-meson configure -Dso=false -Dstatic=false -Dbin=true build
+meson setup -Dlib=false -Dbin=true build
 ninja -C build
 cd build
 meson test

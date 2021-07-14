@@ -1,8 +1,11 @@
-project('ce-login', 'cpp',
-  version : '1.0.0')
+project('ce-login',
+        'cpp',
+         version : '1.0.0',
+         default_options : 'default_library=static'
+         )
 
-cpp = meson.get_compiler('cpp')
-
+#dependencies
+cxx = meson.get_compiler('cpp')
 #Intended to be configured if this does not match your openssl include loc
 #Should not be required if package config is found for openssl though
 openssl_include_dir = '/usr/include/openssl'
@@ -12,7 +15,7 @@ cwd = meson.current_source_dir()
 
 libcrypto = dependency('libcrypto', required : false)
 if not libcrypto.found()
-  libcrypto = cpp.find_library('crypto', required : false )
+  libcrypto = cxx.find_library('crypto', required : false )
   if not libcrypto.found()
     #Last resort to build with libcrypto
     crypto_inc = include_directories ( openssl_include_dir )
@@ -22,7 +25,7 @@ endif
 
 libssl = dependency('libssl', required : false)
 if not libssl.found()
-  libssl = cpp.find_library('ssl', required : false)
+  libssl = cxx.find_library('ssl', required : false)
   if not libssl.found()
     #Last resort to build with libssl
     crypto_inc = include_directories ( openssl_include_dir )
@@ -30,12 +33,12 @@ if not libssl.found()
   endif
 endif
 
-ldl = declare_dependency( link_args : '-ldl' )
-#Needed for cli
-ljsonc = declare_dependency( link_args : '-ljson-c' )
+#Fetches jsmn header library
+jsmn = dependency('jsmn', required : true, fallback : ['jsmn', 'jsmn_dep'])
+lib_deps = [ libcrypto, libssl, jsmn ]
 
-deps = [ libcrypto, libssl, ldl, ljsonc  ]
-args = ['-O2', '-DMFG_IBMI_TARGET']
+#includes
+inc_dir = include_directories(['celogin/include', './cli', 'celogin/src' ])
 
 #sources
 ce_login_sources = ['celogin/src/CeLoginAsnV1.cpp',
@@ -56,36 +59,29 @@ cli_sources = [ 'cli/CliCeLoginV1.cpp',
                 'cli/main.cpp',
                 ]
 
-srcs = ce_login_sources + cli_sources
+all_srcs = ce_login_sources + cli_sources
 
-#jsmn is a build dependency
-#Get it from github
-#jsmn commit ID at time of creating this project
-JSMN_COMMITID = '053d3cd29200edb1bfd181d917d140c16c1f8834'
-lr = run_command('ls', 'jsmn')
-if lr.returncode() !=0
-  r = run_command('git', 'clone', 'https://github.com/zserge/jsmn', 'jsmn')
-  if r.returncode() != 0
-    error(r.stdout().strip())
-  endif
-  r = run_command('git', '--git-dir', './jsmn/.git', 'checkout', JSMN_COMMITID)
-endif
+#compiler arguments
+args = ['-O2', '-DMFG_IBMI_TARGET']
 
-idir = include_directories(['celogin/include', './cli', 'celogin/src', './jsmn'])
-
-if get_option('static')
-  ce_login_a = static_library('celogin', cpp_args : args + ['-fPIC'], sources : ce_login_sources, dependencies : deps, soversion : '0', include_directories : idir, install : true)
-  lib_ce_login_dep = declare_dependency( include_directories : [idir] , link_with : ce_login_a)
-endif
-
-if get_option('so')
-  install_headers(['celogin/include/CeLogin.h'], install_dir : 'include/celogin' )
-  shared_library('celogin', cpp_args : args + ['-fPIC'], sources : srcs, dependencies : ce_login_sources, soversion : '0', include_directories : idir, install : true)
+#library target
+if get_option('lib')
+  ce_login_lib = library('celogin', cpp_args : args, pic : true, sources : ce_login_sources, dependencies : lib_deps, include_directories : inc_dir, install : true)
+  #dependency definition for export to other projects
+  lib_ce_login_dep = declare_dependency( dependencies : lib_deps, include_directories : inc_dir, link_with : ce_login_lib)
 endif
 
 #Ce-login utility for generating access control files
 if get_option('bin')
-  exe = executable('celogin_cli', cpp_args : args, target_type : 'executable', sources : srcs, dependencies : deps, include_directories : idir)
+
+  #Need jsonc for celogin_cli
+  jsonc = dependency('json-c', required : false)
+  if not libssl.found()
+    cxx.find_library('json-c', required : true)
+  endif
+  cli_deps = [ lib_deps, jsonc ]
+
+  exe = executable('celogin_cli', cpp_args : args, sources : all_srcs, dependencies : cli_deps, include_directories : inc_dir)
 
 #Tests to run against celogin_cli creating ACF, validating, and decoding.
 #Priority is set for ordering of commands as some tests depend on each other,

@@ -9,7 +9,6 @@
 #include "openssl/x509.h"
 
 #include <getopt.h>
-#include <json-c/json.h>
 #include <security/pam_ext.h>
 #include <security/pam_modules.h>
 #include <security/pam_modutil.h>
