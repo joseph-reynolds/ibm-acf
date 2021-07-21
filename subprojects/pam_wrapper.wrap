@@ -1,0 +1,4 @@
+[wrap-git]
+url = https://git.samba.org/pam_wrapper.git
+revision = 4efe631246d9b1475b6e8836d68e71f482493f6a
+patch_directory = pam_wrapper_overlay

@@ -1,0 +1,6 @@
+// /etc/acf/service.acf
+// /etc/acf/ibmacf-prod.key
+// /etc/acf/ibmacf-dev.key
+#define ACF_FILE_PATH "@servicefiledir@"
+#define PROD_PUB_KEY_FILE_PATH "@ibmacf_prod_key@"
+#define DEV_PUB_KEY_FILE_PATH  "@ibmacf_dev_key@"

@@ -53,7 +53,7 @@ Create ACF:
 ./celogin_cli create \
                 --machine 'P10,dev,12345' \
                 --sourceFileName "none" \
-                --password "0penBmc123" \
+                --password "0penBmc" \
                 --expirationDate "2025-12-25" \
                 --requestId "1234" \
                 --pkey ../p10-celogin-lab-pkey.der \
@@ -65,7 +65,7 @@ Verify ACF:
 ./celogin_cli verify \
                 --hsfFile ./service.acf \
                 --publicKeyFile ../p10-celogin-lab-pub.der \
-                --password "0penBmc123" \
+                --password "0penBmc" \
                 --serialNumber "12345"
 ```
 

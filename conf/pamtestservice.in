@@ -1,0 +1,5 @@
+#%PAM-1.0
+auth	required @moduledir@
+account	required @moduledir@
+password required @moduledir@
+session	required @moduledir@

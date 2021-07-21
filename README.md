@@ -9,6 +9,18 @@ libpam, libssl, libsdplus
 meson setup build
 ninja -C build
 ```
+## To run ibm-acf pam module unit tests, enable the tests option
+Note: tests=enabled disables creating the unmodified pam_ibmacf module
+```
+meson setup -Dtests=enabled build
+or
+meson configure -Dtests=enabled build
+
+cd build
+meson test
+```
+Test status should display location of log file to view in depth logs of test
+
 
 ### How to setup this feature
 #### Overview
@@ -55,7 +67,7 @@ The --machine argument can either be "x,x,UNSET" or the serial number fetched fr
 ./celogin_cli create \
                 --machine 'P10,dev,12345' \
                 --sourceFileName "none" \
-                --password "0penBmc123" \
+                --password "0penBmc" \
                 --expirationDate "2025-12-25" \
                 --requestId "1234" \
                 --pkey ../p10-celogin-lab-pkey.der \
