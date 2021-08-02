@@ -1,5 +1,5 @@
 #%PAM-1.0
 auth	required @moduledir@
-account	required @moduledir@
-password required @moduledir@
+account	 [success=ok default=ignore] @moduledir@
+password  [success=ok default=die] @moduledir@
 session	required @moduledir@

@@ -28,7 +28,7 @@ TEST(Account, pam_account_service_user_test) {
     EXPECT_EQ(PAM_SUCCESS, test_pam_acct("service"));
 }
 TEST(Account, pam_account_root_user_test) {
-    EXPECT_EQ(PAM_SUCCESS, test_pam_acct("root"));
+    EXPECT_EQ(PAM_PERM_DENIED, test_pam_acct("root"));
 }
 
 TEST(Chauthtok, pam_chauthtok_service_user_test) {
