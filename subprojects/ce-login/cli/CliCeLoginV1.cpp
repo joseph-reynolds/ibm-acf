@@ -10,13 +10,13 @@
 #include "openssl/x509.h" // Needed for reading in public key
 
 #include <CeLogin.h>
+#include <inttypes.h>
 #include <json-c/json.h>
 #include <openssl/asn1.h>
 #include <openssl/asn1t.h>
 #include <openssl/sha.h>
 #include <string.h>
 
-#include <cinttypes>
 #include <iostream>
 #include <sstream>
 #include <vector>
@@ -46,9 +46,27 @@ CeLogin::CeLoginRc
     // Hash password
     if (CeLoginRc::Success == sRc)
     {
-        sRc = CeLogin::createPasswordHash(
-            argsParm.mPassword.data(), argsParm.mPassword.size(),
-            sPasswordHash.data(), sPasswordHash.size());
+        if (PasswordHash_Production == argsParm.mPasswordHashAlgorithm)
+        {
+            sRc = CeLogin::createPasswordHash(
+                argsParm.mPassword.data(), argsParm.mPassword.size(),
+                sPasswordHash.data(), sPasswordHash.size());
+        }
+        else if (PasswordHash_SHA512 == argsParm.mPasswordHashAlgorithm)
+        {
+            bool sSuccess = cli::createSha256PasswordHash(argsParm.mPassword,
+                                                          sPasswordHash);
+            if (!sSuccess)
+            {
+                sRc = CeLoginRc::Failure;
+            }
+        }
+        else
+        {
+            std::cout << "Error, unrecognized hash algorithm for password"
+                      << std::endl;
+            sRc = CeLoginRc::Failure;
+        }
     }
 
     // Convert binary hash to Hex String

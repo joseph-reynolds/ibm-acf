@@ -5,7 +5,7 @@
 #include <string.h>
 #include <unistd.h> // getopt
 
-#include <cinttypes>
+#include <inttypes.h>
 #include <fstream>
 #include <iostream>
 #include <sstream>
