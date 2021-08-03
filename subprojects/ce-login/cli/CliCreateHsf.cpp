@@ -316,7 +316,7 @@ CeLogin::CeLoginRc cli::createHsf(int argc, char** argv)
         else
         {
             cout << "ERROR: Unrecognized password hash algorithm" << endl;
-            return false;
+            return sRc;
         }
 
         vector<uint8_t> sAcfBinary;
