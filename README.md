@@ -2,13 +2,25 @@
 Access Control File functions
 
 ## This repository depends on the following libraries and should be installed on build machine:
-libpam, libssl, libsdplus, pthread
+libpam, libssl, libsdplus
 
 ## To build the ibm-acf pam module run these commands:
 ```
 meson setup build
 ninja -C build
 ```
+## To run ibm-acf pam module unit tests, enable the tests option
+Note: tests=enabled disables creating the unmodified pam_ibmacf module
+```
+meson setup -Dtests=enabled build
+or
+meson configure -Dtests=enabled build
+
+cd build
+meson test
+```
+Test status should display location of log file to view in depth logs of test
+
 
 ### How to setup this feature
 #### Overview
@@ -36,8 +48,7 @@ openssl rsa -in rsakeys.pem -outform DER -out rsaprivkey.der
 #### Step 2. Build the celogin_cli utility
 ```
 cd subprojects/ce-login
-meson setup build
-meson configure -Dso=false -Dstatic=false -Dbin=true build
+meson setup -Dlib=false -Dbin=true build
 ninja -C build
 ```
 
@@ -51,11 +62,16 @@ The value can also be retrieved from the BMC shell with the following command:
 busctl get-property xyz.openbmc_project.Inventory.Manager /xyz/openbmc_project/inventory/system xyz.openbmc_project.Inventory.Decorator.Asset SerialNumber
 ```
 
-The --serialNumber argument can either be "UNSET" or the serial number fetched from the BMC\
+The --machine argument can either be "x,x,UNSET" or the serial number fetched from the BMC "x,x,123454321"
 ```
-./build/celogin_cli create --processingType "P" --sourceFileName "none" --serialNumber "UNSET" \
-                     --frameworkEc "PWR10D " --password "0penBmc" --expirationDate "2025-12-25" \
-                     --requestId "1234" --pkey ./rsaprivkey.der --output ./ACFFile.bin --verbose
+./celogin_cli create \
+                --machine 'P10,dev,12345' \
+                --sourceFileName "none" \
+                --password "0penBmc" \
+                --expirationDate "2025-12-25" \
+                --requestId "1234" \
+                --pkey ../p10-celogin-lab-pkey.der \
+                --output ./service.acf
 ```
 
 #### Step 4. Upload ACF and Pubkey to BMC

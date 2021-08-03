@@ -7,9 +7,8 @@
 #include "openssl/err.h"
 #include "openssl/rsa.h"
 #include "openssl/x509.h"
-
+#include <map>
 #include <getopt.h>
-#include <json-c/json.h>
 #include <security/pam_ext.h>
 #include <security/pam_modules.h>
 #include <security/pam_modutil.h>
@@ -18,8 +17,6 @@
 #include <sys/types.h>
 #include <syslog.h>
 #include <unistd.h>
-
-#include <sdbusplus/bus.hpp>
 
 #include <chrono>
 #include <ctime>
@@ -33,9 +30,19 @@
 #define FAILURE -1
 #define SOURCE_FILE_VERSION 1
 #define UNSET_SERIAL_NUM_KEYWORD "UNSET"
+
+//RUN_UNIT_TESTS should only be enabled when running
+//meson unit tests, otherwise this shoudn't be enabled
+#ifdef RUN_UNIT_TESTS
+#include "testconf.h"
+// print logs to stdout under test
+#define pam_syslog(X, Y, ...) printf(__VA_ARGS__)
+#else
+#include <sdbusplus/bus.hpp>
 #define ACF_FILE_PATH "/etc/acf/service.acf"
 #define PROD_PUB_KEY_FILE_PATH "/etc/acf/ibmacf-prod.key"
 #define DEV_PUB_KEY_FILE_PATH "/etc/acf/ibmacf-dev.key"
+#endif
 
 // DBUS definitions for getting host's serial number property
 #define DBUS_INVENTORY_SYSTEM_OBJECT "/xyz/openbmc_project/inventory/system"
@@ -140,7 +147,7 @@ int ignore_other_accounts(pam_handle_t* pamh, const char* user_parm)
     int retval = pam_get_user(pamh, &login_user, NULL);
     if (retval != PAM_SUCCESS)
     {
-        pam_syslog(pamh, LOG_NOTICE, "Unable to get user name: %s",
+        pam_syslog(pamh, LOG_NOTICE, "Unable to get user name: %s\n",
                    pam_strerror(pamh, retval));
         return retval;
     }
@@ -175,7 +182,7 @@ bool readBinaryFile(const std::string fileNameParm,
         }
         else
         {
-            pam_syslog(pamh, LOG_WARNING, "Failed to open file %s",
+            pam_syslog(pamh, LOG_WARNING, "Failed to open file %s\n",
                        fileNameParm.c_str());
         }
     }
@@ -223,27 +230,41 @@ int verifyACF(string acfPubKeypath, const char* passwordParm, string mSerialNumb
             }
             else
             {
-                pam_syslog(pamh, LOG_WARNING, "Error number: 0x%X",
+                pam_syslog(pamh, LOG_WARNING, "Error number: 0x%X\n",
                            (int)sRc.mReason);
-                pam_syslog(pamh, LOG_WARNING, "Error message: %s",
+                pam_syslog(pamh, LOG_WARNING, "Error message: %s\n",
                            (mapping.at((int)sRc.mReason)).c_str());
                 return PAM_AUTH_ERR;
             }
         }
         else
         {
-            pam_syslog(pamh, LOG_WARNING, "failed reading public key.");
+            pam_syslog(pamh, LOG_WARNING, "failed reading public key.\n");
             return PAM_SYSTEM_ERR;
         }
     }
     else
     {
-        pam_syslog(pamh, LOG_WARNING, "failed reading ACF.");
+        pam_syslog(pamh, LOG_WARNING, "failed reading ACF.\n");
         return PAM_SYSTEM_ERR;
     }
     return PAM_SUCCESS;
 }
+#ifdef RUN_UNIT_TESTS
+int fieldModeEnabled = 1;
+string mSerialNumber = "UNSET";
+//manually set variables (fieldModeEnabled and mSerialNumber)
+//for googletest for as dbus objects
+//aren't available on non OpenBMC targets
+void setFieldModeProperty(int fieldModeEnabledParam)
+{
+    fieldModeEnabled = fieldModeEnabledParam;
+}
 
+void setSerialNumberProperty(const string& obj){
+    mSerialNumber = obj;
+}
+#else
 int readFieldModeProperty(const string& obj, const string& inf,
                           const string& prop, pam_handle_t* pamh)
 {
@@ -264,14 +285,14 @@ int readFieldModeProperty(const string& obj, const string& inf,
             result.read(val);
             if (auto pVal = std::get_if<bool>(&val))
             {
-                pam_syslog(pamh, LOG_DEBUG, "FieldModeProperty = %d", (*pVal));
+                pam_syslog(pamh, LOG_DEBUG, "FieldModeProperty = %d\n", (*pVal));
                 propBool = (*pVal);
             }
         }
     }
     catch (const std::exception& exc)
     {
-        pam_syslog(pamh, LOG_ERR, "dbus call failure: %s", exc.what());
+        pam_syslog(pamh, LOG_ERR, "dbus call failure: %s\n", exc.what());
         return FAILURE;
     }
 
@@ -303,19 +324,20 @@ string readMachineSerialNumberProperty(const string& obj, const string& inf,
             else
             {
                 pam_syslog(pamh, LOG_ERR,
-                           "could not get the host's serial number");
+                           "could not get the host's serial number\n");
             }
         }
     }
     catch (const std::exception& exc)
     {
         pam_syslog(pamh, LOG_ERR,
-                   "dbus call for getting serial number failured: %s",
+                   "dbus call for getting serial number failured: %s\n",
                    exc.what());
         propSerialNum = "";
     }
     return propSerialNum;
 }
+#endif
 
 PAM_EXTERN int pam_sm_authenticate(pam_handle_t* pamh, int flags, int argc,
                                    const char** argv)
@@ -343,26 +365,28 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t* pamh, int flags, int argc,
 
     if (retval != PAM_SUCCESS)
     {
-        pam_syslog(pamh, LOG_WARNING, "Unable to get password");
+        pam_syslog(pamh, LOG_WARNING, "Unable to get password\n");
         return PAM_AUTH_ERR;
     }
 
     const char* user_parm = default_user;
     string acfDevPubKeypath = (DEV_PUB_KEY_FILE_PATH);
     string acfProdPubKeypath = (PROD_PUB_KEY_FILE_PATH);
-    pam_syslog(pamh, LOG_INFO, "Performing ACF auth for the %s user.",
+    pam_syslog(pamh, LOG_INFO, "Performing ACF auth for the %s user.\n",
                user_parm);
 
     // Get host's serial number
+#ifndef RUN_UNIT_TESTS
     string mSerialNumber = readMachineSerialNumberProperty(
         DBUS_INVENTORY_SYSTEM_OBJECT, DBUS_INVENTORY_ASSET_INTERFACE,
         DBUS_SERIAL_NUM_PROP, pamh);
+#endif
     // If serial number is empty on machine set as UNSET for check with acf
     if (mSerialNumber.empty())
     {
         mSerialNumber = UNSET_SERIAL_NUM_KEYWORD;
     }
-    pam_syslog(pamh, LOG_INFO, "Host Serial Number = %s",
+    pam_syslog(pamh, LOG_INFO, "Host Serial Number = %s\n",
                mSerialNumber.c_str());
 
     int verifyRc = PAM_AUTH_ERR;
@@ -374,20 +398,22 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t* pamh, int flags, int argc,
     if (verifyRc == PAM_SUCCESS)
     {
         pam_syslog(pamh, LOG_INFO,
-                   "Production ACF authentication completed successfully");
+                   "Production ACF authentication completed successfully\n");
         return PAM_SUCCESS;
     }
     else
     {
 
         // Only check for development key if BMC is not in field mode
+#ifndef RUN_UNIT_TESTS
         int fieldModeEnabled = readFieldModeProperty(
             DBUS_SOFTWARE_OBJECT, DBUS_FIELDMODE_INTERFACE,
             DBUS_FIELD_MODE_PROP, pamh);
+#endif
         if (fieldModeEnabled == FAILURE)
         {
             pam_syslog(pamh, LOG_ERR,
-                       "Could not get field mode enabled property");
+                       "Could not get field mode enabled property\n");
             return PAM_SYSTEM_ERR;
         }
 
@@ -399,7 +425,7 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t* pamh, int flags, int argc,
             {
                 pam_syslog(
                     pamh, LOG_INFO,
-                    "Development ACF authentication completed successfully");
+                    "Development ACF authentication completed successfully\n");
                 return PAM_SUCCESS;
             }
         }
@@ -421,7 +447,7 @@ PAM_EXTERN int pam_sm_acct_mgmt(pam_handle_t* pamh, int flags, int argc,
     int retval = ignore_other_accounts(pamh, user_parm);
     if (retval == PAM_IGNORE)
     {
-        retval = PAM_SUCCESS;
+        retval = PAM_PERM_DENIED;
     }
     return retval;
 }
@@ -444,10 +470,15 @@ PAM_EXTERN int pam_sm_chauthtok(pam_handle_t* pamh, int flags, int argc,
     // Only handle the service user.  Reject all password changes.
     const char* user_parm = default_user;
     int retval = ignore_other_accounts(pamh, user_parm);
-    if (retval == PAM_SUCCESS)
-    {
-        // Do not allow the special service user to change password.
-        retval = PAM_AUTHTOK_ERR;
+    switch(retval) {
+        case PAM_SUCCESS:
+            retval = PAM_AUTHTOK_ERR;
+            break;
+
+        case PAM_IGNORE:
+            retval = PAM_SUCCESS;
+            break;
     }
+
     return retval;
 }

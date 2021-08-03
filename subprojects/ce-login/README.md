@@ -1,21 +1,35 @@
 # ce-login
-Ce-Login depends on the following libraries and should be installed on build machine:\
-libcrypto, libssl, lsl, jsonc
+Ce-Login depends on the following libraries and should be installed on build machine:
 
-To build the ce-login utility run these commands:\
+libcrypto, libssl, json-c (celogin_cli)
+
+To build the ce-login utility run these commands:
 ```
-meson setup build
-meson configure -Dso=false -Dstatic=false -Dbin=true build
+meson setup -Dlib=false -Dbin=true build
 ninja -C build
 ```
 
-To build only the ce-login shared library run these command:
-```
-meson setup build
-meson configure -Dso=true -Dstatic=false -Dbin=false build
-ninja -C build
-```
+There is support to build either the cli utility, static lib or shared lib.
 
+The options can be configured on setup or afterwards with the 'meson configure' command
+
+Set any of the options to 'true' to build desired target
+```
+meson configure -Dlib=[true | false] -Dbin=[true | false] -Ddefault_library=[shared | static] build
+```
+Default configuration is:
+```
+-Dlib=true -Dbin=false -Ddefault_library=static
+```
+As defined by meson_options.txt
+
+Running unit tests:
+```
+meson setup -Dlib=false -Dbin=true build
+ninja -C build
+cd build
+meson test
+```
 
 Example creation of pub/priv keys for this utility:
 
@@ -36,30 +50,36 @@ Example usage of this utility:
 
 Create ACF:
 ```
-./celogin_cli create --processingType "P" --sourceFileName "none" --serialNumber "0000000000000000" \
-                     --frameworkEc "PWR10D" --password "password" --expirationDate "2025-12-25" \
-                     --requestId "1234" --pkey ../p10-celogin-lab-pkey.der --output ./ACFFile.bin --verbose
-RC: 0
-217
+./celogin_cli create \
+                --machine 'P10,dev,12345' \
+                --sourceFileName "none" \
+                --password "0penBmc" \
+                --expirationDate "2025-12-25" \
+                --requestId "1234" \
+                --pkey ../p10-celogin-lab-pkey.der \
+                --output ./service.acf \
 ```
 
 Verify ACF:
 ```
-./celogin_cli verify --hsfFile $CWD/scratch/acf.bin --publicKeyFile ../p10-celogin-lab-pub.der \
-                     --password "password" --serialNumber "0000000000000000"
+./celogin_cli verify \
+                --hsfFile ./service.acf \
+                --publicKeyFile ../p10-celogin-lab-pub.der \
+                --password "0penBmc" \
+                --serialNumber "12345"
 ```
 
 Decode ACF - Decodes and prints contents of ACF:
 ```
-run decode --hsfFile ./ACFFile.bin  --publicKeyFile ../p10-celogin-lab-pub.der
+./celogin_cli decode \
+                --hsfFile ./service.acf \
+                --publicKeyFile ../p10-celogin-lab-pub.der
 ```
 
-Supported keyword value pairs:\
+Supported keyword value pairs:
 
-framworkEC:[PWR10D,PWR10S]\
-processingType:[P]\
-serialNumber:[ string of digits or UNSET keyword]\
-requestId:[unrestricted]\
-sourceFileName:[unrestricted]\
-expirationDate:[yyyy-mm-dd format only]\
-password:[unrestricted]\
+machine: [ ProcessorGeneration (P10), ServiceAuthority (ce | dev), SerialNumber ( "UNSET" | bmc serial number )]\
+requestId: [unrestricted]\
+sourceFileName: [unrestricted]\
+expirationDate: [yyyy-mm-dd format only]\
+password: [unrestricted]

@@ -163,10 +163,12 @@ void printDecodedHsf(const CeLogin::CeLoginDecryptedHsfArgsV1& hsfParm)
     cout << "}" << endl;
 }
 
-bool cli::decodeHsf(int argc, char** argv)
+CeLogin::CeLoginRc cli::decodeHsf(int argc, char** argv)
 {
     DecodeArguments sArgs;
     decodeParseArgs(argc, argv, sArgs);
+
+    CeLogin::CeLoginRc sRc = CeLogin::CeLoginRc::Failure;
 
     if (sArgs.mHelp)
     {
@@ -183,7 +185,7 @@ bool cli::decodeHsf(int argc, char** argv)
                 if (readBinaryFile(sArgs.mPublicKeyFileName, sPublicKey))
                 {
                     CeLogin::CeLoginDecryptedHsfArgsV1 sDecodedHsf;
-                    CeLogin::CeLoginRc sRc =
+                    sRc =
                         CeLogin::decodeAndVerifyCeLoginHsfV1(sHsf, sPublicKey,
                                                              sDecodedHsf);
                     if (CeLoginRc::Success == sRc)
@@ -222,5 +224,5 @@ bool cli::decodeHsf(int argc, char** argv)
         cout << "Args failed to validate" << endl;
     }
 
-    return false;
+    return sRc;
 }

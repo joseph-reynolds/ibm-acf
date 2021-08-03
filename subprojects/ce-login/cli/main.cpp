@@ -1,6 +1,6 @@
 
 #include "CeLoginCli.h"
-
+#include <CeLogin.h>
 #include <getopt.h>
 #include <string.h>
 #include <unistd.h> // getopt
@@ -14,22 +14,25 @@
 int main(int argc, char** argv)
 {
     bool sPrintHelp = true;
+
+    CeLogin::CeLoginRc sRc = CeLogin::CeLoginRc::Failure;
+
     if (argc > 1)
     {
         if (0 == strcmp(argv[1], "create"))
         {
             sPrintHelp = false;
-            cli::createHsf(argc, argv);
+            sRc = cli::createHsf(argc, argv);
         }
         else if (0 == strcmp(argv[1], "decode"))
         {
             sPrintHelp = false;
-            cli::decodeHsf(argc, argv);
+            sRc = cli::decodeHsf(argc, argv);
         }
         else if (0 == strcmp(argv[1], "verify"))
         {
             sPrintHelp = false;
-            cli::verifyHsf(argc, argv);
+            sRc = cli::verifyHsf(argc, argv);
         }
         else if (0 == strcmp(argv[1], "test"))
         {
@@ -49,4 +52,5 @@ int main(int argc, char** argv)
         std::cout << "    " << argv[0]
                   << " [create|decode|verify|test] [-h|--help]" << std::endl;
     }
+    return (int)sRc.mReason;
 }

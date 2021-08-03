@@ -1,0 +1,4 @@
+[wrap-git]
+url = https://github.com/zserge/jsmn
+revision = 053d3cd29200edb1bfd181d917d140c16c1f8834
+patch_directory = jsmn-overlay

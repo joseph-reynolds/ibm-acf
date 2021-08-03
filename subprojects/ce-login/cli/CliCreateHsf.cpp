@@ -266,11 +266,12 @@ void createPrintHelp(int argc, char** argv)
     }
 }
 
-bool cli::createHsf(int argc, char** argv)
+CeLogin::CeLoginRc cli::createHsf(int argc, char** argv)
 {
     CreateArguments sArgs;
-
     createParseArgs(argc - 1, argv + 1, sArgs);
+
+    CeLogin::CeLoginRc sRc = CeLogin::CeLoginRc::Failure;
 
     if (sArgs.mHelp)
     {
@@ -319,8 +320,7 @@ bool cli::createHsf(int argc, char** argv)
         }
 
         vector<uint8_t> sAcfBinary;
-        CeLogin::CeLoginRc sRc =
-            CeLogin::createCeLoginAcfV1(sCreateHsfArgs, sAcfBinary);
+        sRc = CeLogin::createCeLoginAcfV1(sCreateHsfArgs, sAcfBinary);
         cout << "RC: " << hex << (int)sRc << endl;
 
         cout << sAcfBinary.size() << endl;
@@ -331,5 +331,5 @@ bool cli::createHsf(int argc, char** argv)
             cout << "Error in file" << endl;
         }
     }
-    return true;
+    return sRc;
 }
