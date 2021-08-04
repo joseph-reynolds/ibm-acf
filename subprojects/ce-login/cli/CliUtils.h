@@ -18,7 +18,7 @@ bool getIntFromJson(json_object* jsonObjectParm, const std::string keyParm,
                     int32_t& resultIntParm);
 bool getStringFromJson(json_object* jsonObjectParm, const std::string keyParm,
                        std::string& resultStringParm);
-bool createSha256PasswordHash(const std::string& passwordParm,
+bool createSha512PasswordHash(const std::string& passwordParm,
                               std::vector<uint8_t>& outputHashParm);
 
 } // namespace cli

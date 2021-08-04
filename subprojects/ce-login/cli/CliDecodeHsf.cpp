@@ -5,9 +5,9 @@
 
 #include <CeLogin.h>
 #include <getopt.h>
+#include <inttypes.h>
 #include <string.h>
 
-#include <inttypes.h>
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -140,26 +140,26 @@ bool decodeValidateArgs(const DecodeArguments& args)
 
 void printDecodedHsf(const CeLogin::CeLoginDecryptedHsfArgsV1& hsfParm)
 {
+    cout << "ProcessingType:\t" << hsfParm.mProcessingType << endl;
+    cout << "SourceFileName:\t" << hsfParm.mSourceFileName << endl;
+    cout << "SourceFileData:" << endl;
     cout << "{" << endl;
-    cout << "\tProcessingType:\t" << hsfParm.mProcessingType << endl;
-    cout << "\tSourceFileName:\t" << hsfParm.mSourceFileName << endl;
-    cout << "\tSourceFileData:" << endl;
-    cout << "\t{" << endl;
-    cout << "\t\tmachines: [" << endl;
+    cout << "\tmachines: [" << endl;
     for (size_t sIdx = 0; sIdx < hsfParm.mMachines.size(); sIdx++)
     {
-        cout << "\t\t\t{" << endl;
-        cout << "\t\t\t\tserialNumber:\t"
-             << hsfParm.mMachines[sIdx].mSerialNumber << endl;
-        cout << "\t\t\t\tframeworkEc:\t" << hsfParm.mMachines[sIdx].mFrameworkEc
+        cout << "\t\t{" << endl;
+        cout << "\t\t\tserialNumber:\t" << hsfParm.mMachines[sIdx].mSerialNumber
              << endl;
-        cout << "\t\t\t}" << endl;
+        cout << "\t\t\tframeworkEc:\t" << hsfParm.mMachines[sIdx].mFrameworkEc
+             << endl;
+        cout << "\t\t}" << endl;
     }
-    cout << "\t\t]" << endl;
-    cout << "\t\thashedAuthCode:\t" << hsfParm.mPasswordHash << endl;
-    cout << "\t\texpiration:\t" << hsfParm.mExpirationDate << endl;
-    cout << "\t\trequestId:\t" << hsfParm.mRequestId << endl;
-    cout << "\t}" << endl;
+    cout << "\t]" << endl;
+    cout << "\thashedAuthCode:\t" << hsfParm.mPasswordHash << endl;
+    cout << "\tsalt:\t" << hsfParm.mSalt << endl;
+    cout << "\titerations:\t" << hsfParm.mIterations << endl;
+    cout << "\texpiration:\t" << hsfParm.mExpirationDate << endl;
+    cout << "\trequestId:\t" << hsfParm.mRequestId << endl;
     cout << "}" << endl;
 }
 
@@ -179,38 +179,36 @@ CeLogin::CeLoginRc cli::decodeHsf(int argc, char** argv)
         vector<uint8_t> sHsf;
         if (readBinaryFile(sArgs.mHsfFileName, sHsf))
         {
+            vector<uint8_t> sPublicKey;
             if (sArgs.mPublicKeyFileName)
             {
-                vector<uint8_t> sPublicKey;
-                if (readBinaryFile(sArgs.mPublicKeyFileName, sPublicKey))
-                {
-                    CeLogin::CeLoginDecryptedHsfArgsV1 sDecodedHsf;
-                    sRc =
-                        CeLogin::decodeAndVerifyCeLoginHsfV1(sHsf, sPublicKey,
-                                                             sDecodedHsf);
-                    if (CeLoginRc::Success == sRc)
-                    {
-                        printDecodedHsf(sDecodedHsf);
-                        cout << "Signature verified" << endl;
-                    }
-                    else if (CeLoginRc::SignatureNotValid == sRc)
-                    {
-                        cout << "Signature is not valid" << endl;
-                    }
-                    else
-                    {
-                        cout << "Error: 0x" << hex << (int)sRc << endl;
-                    }
-                }
-                else
+                if (!readBinaryFile(sArgs.mPublicKeyFileName, sPublicKey))
                 {
                     cout << "ERROR: Unable to read public key file: \""
                          << sArgs.mPublicKeyFileName << "\"" << endl;
+                    return sRc;
                 }
             }
             else
             {
-                cout << "ERROR, provide public key file " << endl;
+                sPublicKey.clear();
+            }
+
+            CeLogin::CeLoginDecryptedHsfArgsV1 sDecodedHsf;
+            sRc = CeLogin::decodeAndVerifyCeLoginHsfV1(sHsf, sPublicKey,
+                                                       sDecodedHsf);
+            if (CeLoginRc::Success == sRc)
+            {
+                printDecodedHsf(sDecodedHsf);
+                cout << "Signature verified" << endl;
+            }
+            else if (CeLoginRc::SignatureNotValid == sRc)
+            {
+                cout << "Signature is not valid" << endl;
+            }
+            else
+            {
+                cout << "Error: 0x" << hex << (int)sRc << endl;
             }
         }
         else

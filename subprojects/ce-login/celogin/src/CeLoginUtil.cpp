@@ -8,9 +8,9 @@
 #include <openssl/crypto.h>
 #include <openssl/rsa.h>
 #include <openssl/x509.h>
-#include <stdio.h>  // sprintf
-#include <stdlib.h> // strtoul
-#include <string.h> // strstr, memcpy, strlen
+#include <stdio.h>   // sprintf
+#include <stdlib.h>  // strtoul
+#include <string.h>  // strstr, memcpy, strlen
 #include <strings.h> // bzero
 
 /// TODO: rtc 268075 Determine if openssl can provide this function. If it can,
@@ -197,7 +197,8 @@ CeLogin::CeLoginRc CeLogin::decodeAndVerifyAcf(
     if (CeLoginRc::Success == sRc)
     {
         const size_t sProcessingTypeLength = strlen(AcfProcessingType);
-        if (sProcessingTypeLength != (size_t)decodedAsnParm->processingType->length ||
+        if (sProcessingTypeLength !=
+                (size_t)decodedAsnParm->processingType->length ||
             memcmp(AcfProcessingType, decodedAsnParm->processingType->data,
                    sProcessingTypeLength))
         {
@@ -282,7 +283,9 @@ CeLogin::CeLoginRc CeLogin::createDigest(const uint8_t* inputDataParm,
 
 CeLogin::CeLoginRc CeLogin::createPasswordHash(
     const char* inputDataParm, const uint64_t inputDataLengthParm,
-    uint8_t* outputHashParm, const uint64_t outputHashSizeParm)
+    const uint8_t* inputSaltParm, const uint64_t inputSaltLengthParm,
+    const uint64_t iterationsParm, uint8_t* outputHashParm,
+    const uint64_t outputHashSizeParm, const uint64_t requestedOutputLengthParm)
 {
     CeLoginRc sRc = CeLoginRc::Success;
     if (!inputDataParm)
@@ -293,21 +296,41 @@ CeLogin::CeLoginRc CeLogin::createPasswordHash(
     {
         sRc = CeLoginRc::CreatePasswordHash_InvalidInputBufferLength;
     }
+    else if (!inputSaltParm)
+    {
+        sRc = CeLoginRc::CreatePasswordHash_InvalidInputSaltBuffer;
+    }
+    else if (0 == inputSaltLengthParm)
+    {
+        sRc = CeLoginRc::CreatePasswordHash_InvalidInputSaltLength;
+    }
     else if (!outputHashParm)
     {
         sRc = CeLoginRc::CreatePasswordHash_InvalidOutputBuffer;
     }
-    else if (outputHashSizeParm < CeLogin_PasswordHashLength)
+    else if (outputHashSizeParm < requestedOutputLengthParm)
     {
         sRc = CeLoginRc::CreatePasswordHash_InvalidOutputBufferLength;
     }
+    else if (0 == iterationsParm)
+    {
+        sRc = CeLoginRc::CreatePasswordHash_ZeroIterations;
+    }
+    else if (iterationsParm > INT_MAX)
+    {
+        // Openssl takes the iteration as an int, any value larger than that
+        // would get truncated.
+        sRc = CeLoginRc::CreatePasswordHash_IterationTooLarge;
+    }
     else
     {
-        // Cast const char* to const uint8_t*
-        uint8_t* sHashResult = SHA512((const uint8_t*)inputDataParm,
-                                      inputDataLengthParm, outputHashParm);
+        // return 1 on success or 0 on error.
+        int sOsslRc =
+            PKCS5_PBKDF2_HMAC(inputDataParm, inputDataLengthParm, inputSaltParm,
+                              inputSaltLengthParm, iterationsParm, EVP_sha512(),
+                              requestedOutputLengthParm, outputHashParm);
 
-        if (outputHashParm != sHashResult)
+        if (1 != sOsslRc)
         {
             sRc = CeLoginRc::CreatePasswordHash_OsslCallFailed;
         }

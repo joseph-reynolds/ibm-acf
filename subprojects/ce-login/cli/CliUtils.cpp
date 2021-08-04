@@ -118,7 +118,7 @@ bool cli::getStringFromJson(json_object* jsonObjectParm,
     return sSuccess;
 }
 
-bool cli::createSha256PasswordHash(const std::string& passwordParm,
+bool cli::createSha512PasswordHash(const std::string& passwordParm,
                                    std::vector<uint8_t>& outputHashParm)
 {
     if (passwordParm.empty())
@@ -126,13 +126,13 @@ bool cli::createSha256PasswordHash(const std::string& passwordParm,
         return false;
     }
 
-    std::vector<uint8_t> sSha256Digest(SHA512_DIGEST_LENGTH);
+    std::vector<uint8_t> sSha512Digest(SHA512_DIGEST_LENGTH);
     uint8_t* sHashResult = SHA512((const uint8_t*)passwordParm.c_str(),
-                                  passwordParm.length(), sSha256Digest.data());
+                                  passwordParm.length(), sSha512Digest.data());
 
-    if (sSha256Digest.data() == sHashResult)
+    if (sSha512Digest.data() == sHashResult)
     {
-        outputHashParm = sSha256Digest;
+        outputHashParm = sSha512Digest;
     }
     else
     {

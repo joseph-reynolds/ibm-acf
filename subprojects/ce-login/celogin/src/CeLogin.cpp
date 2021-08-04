@@ -1,4 +1,3 @@
-
 #include "CeLoginAsnV1.h"
 #include "CeLoginJson.h"
 #include "CeLoginUtil.h"
@@ -25,7 +24,7 @@ CeLogin::CeLoginRc CeLogin::getServiceAuthorityV1(
 {
     CeLoginRc sRc = CeLoginRc::Success;
     authorityParm = CeLogin::ServiceAuth_None;
-    uint8_t sPasswordHash[CeLogin_PasswordHashLength];
+    uint8_t sGeneratedAuthCode[CeLogin_MaxHashedAuthCodeLength];
 
     CELoginSequenceV1* sDecodedAsn = NULL;
 
@@ -160,15 +159,18 @@ CeLogin::CeLoginRc CeLogin::getServiceAuthorityV1(
     // Hash the provided ACF password
     if (CeLoginRc::Success == sRc)
     {
-        sRc = createPasswordHash(passwordParm, passwordLengthParm,
-                                 sPasswordHash, sizeof(sPasswordHash));
+        sRc = createPasswordHash(
+            passwordParm, passwordLengthParm, sJsonData->mAuthCodeSalt,
+            sJsonData->mAuthCodeSaltLength, sJsonData->mIterations,
+            sGeneratedAuthCode, sizeof(sGeneratedAuthCode),
+            sJsonData->mHashedAuthCodeLength);
     }
 
     // Verify password hash matches the ACF hashed auth code
     if (CeLoginRc::Success == sRc)
     {
-        if (0 != CRYPTO_memcmp(sPasswordHash, sJsonData->mHashedAuthCode,
-                               CeLogin_PasswordHashLength))
+        if (0 != CRYPTO_memcmp(sGeneratedAuthCode, sJsonData->mHashedAuthCode,
+                               sJsonData->mHashedAuthCodeLength))
         {
             sRc = CeLoginRc::PasswordNotValid;
         }

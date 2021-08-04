@@ -21,6 +21,7 @@ enum
 {
     CeLoginInvalidVersion = 0,
     CeLoginVersion1 = 1,
+    CeLogin_PBKDF2_Iterations = 10000,
 };
 
 struct CeLoginRc
@@ -62,6 +63,8 @@ struct CeLoginRc
         DecodeHsf_ReadHashedAuthCodeFailure = 0x2B,
         DecodeHsf_ReadExpirationFailure = 0x2C,
         DecodeHsf_ReadRequestIdFailure = 0x2D,
+        DecodeHsf_ReadSaltFailure = 0x2E,
+        DecodeHsf_ReadIterationsFailure = 0x2F,
 
         VerifyAcf_AsnDecodeFailure = 0x30,
         VerifyAcf_OidMismatchFailure = 0x31,
@@ -100,6 +103,10 @@ struct CeLoginRc
         CreatePasswordHash_InvalidOutputBuffer = 0x92,
         CreatePasswordHash_InvalidOutputBufferLength = 0x93,
         CreatePasswordHash_OsslCallFailed = 0x94,
+        CreatePasswordHash_InvalidInputSaltBuffer = 0x95,
+        CreatePasswordHash_InvalidInputSaltLength = 0x96,
+        CreatePasswordHash_ZeroIterations = 0x97,
+        CreatePasswordHash_IterationTooLarge = 0x98,
 
         CreateDigest_InvalidInputBuffer = 0xA0,
         CreateDigest_InvalidInputBufferLength = 0xA1,

@@ -4,17 +4,18 @@
 #include "../celogin/src/CeLoginJson.h"
 #include "../celogin/src/CeLoginUtil.h"
 #include "CliUtils.h"
-#include "openssl/obj_mac.h"
-#include "openssl/objects.h"
-#include "openssl/rsa.h"
-#include "openssl/x509.h" // Needed for reading in public key
 
 #include <CeLogin.h>
 #include <inttypes.h>
 #include <json-c/json.h>
 #include <openssl/asn1.h>
 #include <openssl/asn1t.h>
+#include <openssl/obj_mac.h>
+#include <openssl/objects.h>
+#include <openssl/rand.h>
+#include <openssl/rsa.h>
 #include <openssl/sha.h>
+#include <openssl/x509.h> // Needed for reading in public key
 #include <string.h>
 
 #include <iostream>
@@ -27,11 +28,15 @@ CeLogin::CeLoginRc
 {
     CeLoginRc sRc = CeLoginRc::Success;
     std::string sPasswordHashHexString;
+    std::string sSaltHexString;
 
     std::string sJsonString;
     std::vector<uint8_t> sJsonDigest(CeLogin::CeLogin_DigestLength);
-    std::vector<uint8_t> sPasswordHash(CeLogin::CeLogin_PasswordHashLength);
+    std::vector<uint8_t> sHashedAuthCode(argsParm.mHashedAuthCodeLength);
+    std::vector<uint8_t> sSalt(argsParm.mSaltLength, 0);
     std::vector<uint8_t> sJsonSignature;
+
+    uint64_t sIterations = argsParm.mIterations;
 
     CELoginSequenceV1* sHsfStruct = NULL;
 
@@ -43,6 +48,17 @@ CeLogin::CeLoginRc
         std::cout << "ERROR line " << __LINE__ << std::endl;
     }
 
+    if (CeLoginRc::Success == sRc &&
+        PasswordHash_Production == argsParm.mPasswordHashAlgorithm)
+    {
+        // Create a random salt
+        int sOsslRc = RAND_bytes(sSalt.data(), sSalt.size());
+        if (1 != sOsslRc)
+        {
+            sRc = CeLoginRc::Failure;
+        }
+    }
+
     // Hash password
     if (CeLoginRc::Success == sRc)
     {
@@ -50,12 +66,14 @@ CeLogin::CeLoginRc
         {
             sRc = CeLogin::createPasswordHash(
                 argsParm.mPassword.data(), argsParm.mPassword.size(),
-                sPasswordHash.data(), sPasswordHash.size());
+                sSalt.data(), sSalt.size(), sIterations, sHashedAuthCode.data(),
+                sHashedAuthCode.size(), sHashedAuthCode.size());
         }
         else if (PasswordHash_SHA512 == argsParm.mPasswordHashAlgorithm)
         {
-            bool sSuccess = cli::createSha256PasswordHash(argsParm.mPassword,
-                                                          sPasswordHash);
+            sIterations = 0;
+            bool sSuccess = cli::createSha512PasswordHash(argsParm.mPassword,
+                                                          sHashedAuthCode);
             if (!sSuccess)
             {
                 sRc = CeLoginRc::Failure;
@@ -72,7 +90,8 @@ CeLogin::CeLoginRc
     // Convert binary hash to Hex String
     if (CeLoginRc::Success == sRc)
     {
-        sPasswordHashHexString = cli::getHexStringFromBinary(sPasswordHash);
+        sPasswordHashHexString = cli::getHexStringFromBinary(sHashedAuthCode);
+        sSaltHexString = cli::getHexStringFromBinary(sSalt);
     }
 
     // Create json structure
@@ -84,6 +103,8 @@ CeLogin::CeLoginRc
 
         json_object* sHashedPassword =
             json_object_new_string(sPasswordHashHexString.c_str());
+        json_object* sSaltObj = json_object_new_string(sSaltHexString.c_str());
+        json_object* sIterationsObj = json_object_new_int(sIterations);
         json_object* sExpirationDate =
             json_object_new_string(argsParm.mExpirationDate.c_str());
         json_object* sRequestId =
@@ -139,6 +160,9 @@ CeLogin::CeLoginRc
             json_object_object_add(sJsonObj, JsonName_Machines, sMachinesArray);
             json_object_object_add(sJsonObj, JsonName_HashedAuthCode,
                                    sHashedPassword);
+            json_object_object_add(sJsonObj, JsonName_Salt, sSaltObj);
+            json_object_object_add(sJsonObj, JsonName_Iterations,
+                                   sIterationsObj);
             json_object_object_add(sJsonObj, JsonName_Expiration,
                                    sExpirationDate);
             json_object_object_add(sJsonObj, JsonName_RequestId, sRequestId);
@@ -288,9 +312,37 @@ CeLogin::CeLoginRc CeLogin::decodeAndVerifyCeLoginHsfV1(
 
     if (CeLoginRc::Success == sRc)
     {
-        sRc = decodeAndVerifyAcf(hsfParm.data(), hsfParm.size(),
-                                 publicKeyParm.data(), publicKeyParm.size(),
-                                 sDecodedAsn);
+        if (!publicKeyParm.empty())
+        {
+            sRc = decodeAndVerifyAcf(hsfParm.data(), hsfParm.size(),
+                                     publicKeyParm.data(), publicKeyParm.size(),
+                                     sDecodedAsn);
+        }
+        else
+        {
+            if (hsfParm.empty())
+            {
+                sRc = CeLoginRc::VerifyAcf_InvalidParm;
+            }
+
+            if (CeLoginRc::Success == sRc)
+            {
+                // return a valid TYPE structure or NULL if an error occurs
+                // NOTE: there is a "reuse" capability where an existing
+                // structure can be provided,
+                //       however in the event of a failure, the structure is
+                //       automatically free'd. Either way there is undesirable
+                //       behavior. So in this case returning a heap allocation
+                //       seems slightly more straightforward.
+                const uint8_t* sHsfPtr = hsfParm.data();
+                sDecodedAsn =
+                    d2i_CELoginSequenceV1(NULL, &sHsfPtr, hsfParm.size());
+                if (!sDecodedAsn)
+                {
+                    sRc = CeLoginRc::VerifyAcf_AsnDecodeFailure;
+                }
+            }
+        }
     }
 
     if (CeLoginRc::Success == sRc)
@@ -305,9 +357,6 @@ CeLogin::CeLoginRc CeLogin::decodeAndVerifyCeLoginHsfV1(
 
     if (CeLoginRc::Success == sRc)
     {
-        std::cout << std::string((char*)sDecodedAsn->sourceFileData->data,
-                                 sDecodedAsn->sourceFileData->length)
-                  << std::endl;
         json_object* sJson =
             json_tokener_parse((const char*)sDecodedAsn->sourceFileData->data);
 
@@ -379,6 +428,20 @@ CeLogin::CeLoginRc CeLogin::decodeAndVerifyCeLoginHsfV1(
                                     decodedHsfParm.mPasswordHash))
         {
             sRc = CeLoginRc::DecodeHsf_ReadHashedAuthCodeFailure;
+        }
+
+        if (CeLoginRc::Success == sRc &&
+            !cli::getStringFromJson(sJson, CeLogin::JsonName_Salt,
+                                    decodedHsfParm.mSalt))
+        {
+            sRc = CeLoginRc::DecodeHsf_ReadSaltFailure;
+        }
+
+        if (CeLoginRc::Success == sRc &&
+            !cli::getIntFromJson(sJson, CeLogin::JsonName_Iterations,
+                                 decodedHsfParm.mIterations))
+        {
+            sRc = CeLoginRc::DecodeHsf_ReadIterationsFailure;
         }
 
         if (CeLoginRc::Success == sRc &&
