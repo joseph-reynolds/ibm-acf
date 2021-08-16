@@ -6,24 +6,24 @@
 #include <CeLogin.h>
 #include <getopt.h>
 #include <inttypes.h>
+#include <limits.h>
 #include <string.h>
+#include <unistd.h>
 
+#include <algorithm>
 #include <fstream>
 #include <iostream>
 #include <sstream>
 #include <string>
 #include <vector>
-#include <algorithm>
 
 using namespace std;
 
 struct CreateArguments
 {
-    string mSourceFileName;
     vector<CeLogin::Machine> mMachines;
     string mPassword;
     string mExpirationDate;
-    string mRequestId;
     string mPrivateKeyFile;
     string mOutputFile;
     string mPasswordHashAlgorithm;
@@ -35,11 +35,9 @@ struct CreateArguments
 
 enum CreateOptOptions
 {
-    SourceFileName,
     Machine,
     Password,
     ExpirationDate,
-    RequestId,
     PrivateKeyFile,
     OutputFile,
     PasswordHashAlgorithm,
@@ -49,11 +47,9 @@ enum CreateOptOptions
 };
 
 struct option create_long_options[NOptOptions + 1] = {
-    {"sourceFileName", required_argument, NULL, 'f'},
     {"machine", required_argument, NULL, 'm'},
     {"password", required_argument, NULL, 'p'},
     {"expirationDate", required_argument, NULL, 'e'},
-    {"requestId", required_argument, NULL, 'i'},
     {"pkey", required_argument, NULL, 'k'},
     {"output", required_argument, NULL, 'o'},
     {"algorithm", required_argument, NULL, 'a'},
@@ -62,11 +58,14 @@ struct option create_long_options[NOptOptions + 1] = {
     {0, 0, 0, 0}};
 
 string create_options_description[NOptOptions] = {
-    "SourceFileName", "<processor gen>,<authority>,<serial number>",
-    "Password",       "ExpirationDate",
-    "RequestId",      "PrivateKeyFile",
-    "OutputFile",     "<sha512|prod> - Password Hash Algorithm",
-    "Help",           "Verbose"};
+    "<processor gen>,<authority>,<serial number>",
+    "Password",
+    "ExpirationDate",
+    "PrivateKeyFile",
+    "OutputFile",
+    "<sha512|prod> - Password Hash Algorithm",
+    "Help",
+    "Verbose"};
 
 bool parseMachineFromString(const string& stringParm,
                             CeLogin::Machine& machineParm)
@@ -137,11 +136,6 @@ void createParseArgs(int argc, char** argv, struct CreateArguments& args)
                         &option_index);
         if (c == -1)
             break;
-        if (c == create_long_options[SourceFileName].val)
-        {
-            sNumOfRequiredArgumentsFound++;
-            args.mSourceFileName = optarg;
-        }
         else if (c == create_long_options[Machine].val)
         {
             sNumOfRequiredArgumentsFound++;
@@ -169,11 +163,6 @@ void createParseArgs(int argc, char** argv, struct CreateArguments& args)
         {
             sNumOfRequiredArgumentsFound++;
             args.mExpirationDate = optarg;
-        }
-        else if (c == create_long_options[RequestId].val)
-        {
-            sNumOfRequiredArgumentsFound++;
-            args.mRequestId = optarg;
         }
         else if (c == create_long_options[PrivateKeyFile].val)
         {
@@ -204,11 +193,6 @@ void createParseArgs(int argc, char** argv, struct CreateArguments& args)
 bool createValidateArgs(const CreateArguments& args)
 {
     bool sIsValidArgs = true;
-    if (args.mSourceFileName.empty())
-    {
-        sIsValidArgs = false;
-        cout << "Error: Missing SourceFileName" << endl;
-    }
     if (args.mMachines.empty())
     {
         sIsValidArgs = false;
@@ -223,11 +207,6 @@ bool createValidateArgs(const CreateArguments& args)
     {
         sIsValidArgs = false;
         cout << "Error: Missing ExpirationDate" << endl;
-    }
-    if (args.mRequestId.empty())
-    {
-        sIsValidArgs = false;
-        cout << "Error: Missing RequestId" << endl;
     }
     if (args.mPrivateKeyFile.empty())
     {
@@ -281,7 +260,7 @@ CeLogin::CeLoginRc cli::createHsf(int argc, char** argv)
     {
         CeLogin::CeLoginCreateHsfArgsV1 sCreateHsfArgs;
 
-        sCreateHsfArgs.mSourceFileName = sArgs.mSourceFileName;
+        sCreateHsfArgs.mSourceFileName = sArgs.mPrivateKeyFile;
 
         sCreateHsfArgs.mMachines = sArgs.mMachines;
 
@@ -289,7 +268,20 @@ CeLogin::CeLoginRc cli::createHsf(int argc, char** argv)
 
         sCreateHsfArgs.mExpirationDate = sArgs.mExpirationDate;
 
-        sCreateHsfArgs.mRequestId = sArgs.mRequestId;
+        char hostname[_POSIX_HOST_NAME_MAX];
+        char username[_POSIX_LOGIN_NAME_MAX];
+        gethostname(hostname, sizeof(hostname));
+        getlogin_r(username, sizeof(username));
+        std::time_t sTime = std::chrono::system_clock::to_time_t(
+            std::chrono::system_clock::now());
+
+        sCreateHsfArgs.mRequestId = std::string(username) + "@" +
+                                    std::string(hostname) + "@" +
+                                    std::ctime(&sTime);
+
+        sCreateHsfArgs.mHashedAuthCodeLength = 512 / 8;
+        sCreateHsfArgs.mSaltLength = 512 / 8;
+        sCreateHsfArgs.mIterations = CeLogin::CeLogin_PBKDF2_Iterations;
 
         vector<uint8_t> sKey;
 

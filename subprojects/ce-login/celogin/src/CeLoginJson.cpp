@@ -28,6 +28,12 @@ enum JsonUtilsRc
     ParseAuthFromMachineArray_NotAnArray = 0x41,
     ParseAuthFromMachineArray_InvalidFrameworkEc = 0x42,
 
+    ParseSalt_InvalidParm = 0x50,
+    ParseSalt_NotString = 0x51,
+    ParseSalt_SaltTooLong = 0x52,
+
+    ParseIterations_InvalidParm = 0x60,
+    ParseIterations_NotPrimitive = 0x61,
 };
 
 enum
@@ -45,11 +51,21 @@ static CeLoginRc ParseAuthorityFromMachineArrayToken(
     const uint64_t machineArrayTokenIdxParm, const char* serialNumberParm,
     const uint64_t serialNumberLengthParm, ServiceAuthority& authorityParm);
 
+static CeLoginRc ParseHashedAuthCodeFromToken(
+    const JsmnUtils::JsmnState& jsmnStateParm,
+    const uint64_t hashedAuthCodeTokenIdxParm, uint8_t* hashedAuthCodeParm,
+    const uint64_t hashedAuthCodeSizeParm, uint64_t bytesWrittenParm);
+
+static CeLoginRc ParseSaltFromToken(const JsmnUtils::JsmnState& jsmnStateParm,
+                                    const uint64_t saltTokenIdxParm,
+                                    uint8_t* saltParm,
+                                    const uint64_t saltSizeParm,
+                                    uint64_t& bytesWrittenParm);
+
 static CeLoginRc
-    ParseHashedAuthCodeFromToken(const JsmnUtils::JsmnState& jsmnStateParm,
-                                 const uint64_t hashedAuthCodeTokenIdxParm,
-                                 uint8_t* hashedAuthCodeParm,
-                                 const uint64_t hashedAuthCodeSizeParm);
+    ParseIterationsFromToken(const JsmnUtils::JsmnState& jsmnStateParm,
+                             const uint64_t saltTokenIdxParm,
+                             uint64_t& iterationsParm);
 
 CeLoginRc CeLogin::decodeJson(const char* jsonStringParm,
                               const uint64_t jsonStringLengthParm,
@@ -73,16 +89,19 @@ CeLoginRc CeLogin::decodeJson(const char* jsonStringParm,
 
     // This is a hardcoded parser. It expects the ACF JSON to look something
     // like this:
-    // {"version":1,
-    // "machines":
-    //      [
-    //        {"serialNumber":"000020012345","frameworkEc":"P46598"},
-    //        {"serialNumber":"UNSET","frameworkEc":"P46598"}
-    //      ],
-    // "hashedAuthCode":"xxxxxxxx",
-    // "expiration":"2018-12-25",
-    // "requestId":"FACE0FF0"}
-    //}
+    // {
+    //     "version":1,
+    //     "machines":
+    //         [
+    //             { "serialNumber":"000020012345", "frameworkEc":"PWR10S" },
+    //             { "serialNumber":"UNSET", "frameworkEc":"PWR10D" }
+    //         ],
+    //     "hashedAuthCode":"xxxxxxxx",
+    //     “salt”:”xxxxxxxxx”,
+    //     “iterations”:”10000”,
+    //     "expiration":"2018-12-25",
+    //     "requestId":"FACE0FF0"
+    // }
 
     // Wrap the json string and tokens array in a nice way
     JsmnUtils::JsmnState sJsmnState;
@@ -109,12 +128,16 @@ CeLoginRc CeLogin::decodeJson(const char* jsonStringParm,
     //      - "machines"
     //      - "hashedAuthCode"
     //      - "expiration"
+    //      - "salt"
+    //      - "iterations"
     // Any others are ignored. If a duplicate is detected, then an error will be
     // returned.
 
     uint64_t sVersionIdx = 0;
     uint64_t sMachinesIdx = 0;
     uint64_t sHashedAuthCodeIdx = 0;
+    uint64_t sSaltIdx = 0;
+    uint64_t sIterationsIdx = 0;
     uint64_t sExpirationIdx = 0;
 
     const uint64_t sObjectTokenIdx = 0; // Index of the root token
@@ -175,6 +198,20 @@ CeLoginRc CeLogin::decodeJson(const char* jsonStringParm,
         if (JsmnUtils::Success == sJsmnRc)
         {
             sJsmnRc = JsmnUtils::ObjectGetValueByKey(
+                sJsmnState, sObjectTokenIdx, JsonName_Salt,
+                strlen(JsonName_Salt), sSaltIdx);
+        }
+
+        if (JsmnUtils::Success == sJsmnRc)
+        {
+            sJsmnRc = JsmnUtils::ObjectGetValueByKey(
+                sJsmnState, sObjectTokenIdx, JsonName_Iterations,
+                strlen(JsonName_Iterations), sIterationsIdx);
+        }
+
+        if (JsmnUtils::Success == sJsmnRc)
+        {
+            sJsmnRc = JsmnUtils::ObjectGetValueByKey(
                 sJsmnState, sObjectTokenIdx, JsonName_Expiration,
                 strlen(JsonName_Expiration), sExpirationIdx);
         }
@@ -194,7 +231,24 @@ CeLoginRc CeLogin::decodeJson(const char* jsonStringParm,
     {
         sRc = ParseHashedAuthCodeFromToken(
             sJsmnState, sHashedAuthCodeIdx, decodedJsonParm.mHashedAuthCode,
-            sizeof(decodedJsonParm.mHashedAuthCode));
+            sizeof(decodedJsonParm.mHashedAuthCode),
+            decodedJsonParm.mHashedAuthCodeLength);
+    }
+
+    // parse salt
+    if (CeLoginRc::Success == sRc)
+    {
+        sRc = ParseSaltFromToken(sJsmnState, sSaltIdx,
+                                 decodedJsonParm.mAuthCodeSalt,
+                                 sizeof(decodedJsonParm.mAuthCodeSalt),
+                                 decodedJsonParm.mAuthCodeSaltLength);
+    }
+
+    // parse number of iterations
+    if (CeLoginRc::Success == sRc)
+    {
+        sRc = ParseIterationsFromToken(sJsmnState, sIterationsIdx,
+                                       decodedJsonParm.mIterations);
     }
 
     // parse machines
@@ -354,13 +408,13 @@ CeLoginRc ParseAuthorityFromMachineArrayToken(
     return sRc;
 }
 
-CeLoginRc
-    ParseHashedAuthCodeFromToken(const JsmnUtils::JsmnState& jsmnStateParm,
-                                 const uint64_t hashedAuthCodeTokenIdxParm,
-                                 uint8_t* hashedAuthCodeParm,
-                                 const uint64_t hashedAuthCodeSizeParm)
+CeLoginRc ParseHashedAuthCodeFromToken(
+    const JsmnUtils::JsmnState& jsmnStateParm,
+    const uint64_t hashedAuthCodeTokenIdxParm, uint8_t* hashedAuthCodeParm,
+    const uint64_t hashedAuthCodeSizeParm, uint64_t bytesWrittenParm)
 {
     CeLoginRc sRc = CeLoginRc::Success;
+    bytesWrittenParm = 0;
 
     if (!jsmnStateParm.isValid() ||
         !jsmnStateParm.isTokenIdxValid(hashedAuthCodeTokenIdxParm))
@@ -383,18 +437,94 @@ CeLoginRc
             JsmnUtils::JsmnString sJsmnString =
                 jsmnStateParm.getString(hashedAuthCodeTokenIdxParm);
 
-            uint64_t sBytesWritten = 0;
             sRc = getBinaryFromHex(sJsmnString.mCharArray,
                                    sJsmnString.mCharLength, hashedAuthCodeParm,
-                                   hashedAuthCodeSizeParm, sBytesWritten);
+                                   hashedAuthCodeSizeParm, bytesWrittenParm);
 
             if (CeLoginRc::Success == sRc &&
-                CeLogin_PasswordHashLength != sBytesWritten)
+                CeLogin_MaxHashedAuthCodeLength < bytesWrittenParm)
             {
                 sRc =
                     CeLoginRc(CeLoginRc::JsonUtils,
                               JsonUtils::ParseHashedAuth_UnexpectedHashLength);
             }
+        }
+    }
+    return sRc;
+}
+
+CeLoginRc ParseSaltFromToken(const JsmnUtils::JsmnState& jsmnStateParm,
+                             const uint64_t saltTokenIdxParm, uint8_t* saltParm,
+                             const uint64_t saltSizeParm,
+                             uint64_t& bytesWrittenParm)
+{
+    CeLoginRc sRc = CeLoginRc::Success;
+    bytesWrittenParm = 0;
+
+    if (!jsmnStateParm.isValid() ||
+        !jsmnStateParm.isTokenIdxValid(saltTokenIdxParm))
+    {
+        sRc = CeLoginRc(CeLoginRc::JsonUtils, JsonUtils::ParseSalt_InvalidParm);
+    }
+    else
+    {
+        const jsmntok_t& sTokenValue = jsmnStateParm.getToken(saltTokenIdxParm);
+
+        if (JSMN_STRING != sTokenValue.type)
+        {
+            sRc =
+                CeLoginRc(CeLoginRc::JsonUtils, JsonUtils::ParseSalt_NotString);
+        }
+        else
+        {
+            JsmnUtils::JsmnString sJsmnString =
+                jsmnStateParm.getString(saltTokenIdxParm);
+
+            sRc = getBinaryFromHex(sJsmnString.mCharArray,
+                                   sJsmnString.mCharLength, saltParm,
+                                   saltSizeParm, bytesWrittenParm);
+
+            if (CeLoginRc::Success == sRc &&
+                CeLogin_MaxHashedAuthCodeSaltLength < bytesWrittenParm)
+            {
+                sRc = CeLoginRc(CeLoginRc::JsonUtils,
+                                JsonUtils::ParseSalt_SaltTooLong);
+            }
+        }
+    }
+    return sRc;
+}
+
+CeLoginRc ParseIterationsFromToken(const JsmnUtils::JsmnState& jsmnStateParm,
+                                   const uint64_t iterationsTokenIdxParm,
+                                   uint64_t& iterationsParm)
+{
+    CeLoginRc sRc = CeLoginRc::Success;
+
+    if (!jsmnStateParm.isValid() ||
+        !jsmnStateParm.isTokenIdxValid(iterationsParm))
+    {
+        sRc = CeLoginRc(CeLoginRc::JsonUtils,
+                        JsonUtils::ParseIterations_InvalidParm);
+    }
+    else
+    {
+        const jsmntok_t& sTokenValue =
+            jsmnStateParm.getToken(iterationsTokenIdxParm);
+
+        if (JSMN_PRIMITIVE != sTokenValue.type)
+        {
+            sRc = CeLoginRc(CeLoginRc::JsonUtils,
+                            JsonUtils::ParseIterations_NotPrimitive);
+        }
+        else
+        {
+            JsmnUtils::JsmnString sJsmnString =
+                jsmnStateParm.getString(iterationsTokenIdxParm);
+
+            sRc = getUnsignedIntegerFromString(sJsmnString.mCharArray,
+                                               sJsmnString.mCharLength,
+                                               iterationsParm);
         }
     }
     return sRc;

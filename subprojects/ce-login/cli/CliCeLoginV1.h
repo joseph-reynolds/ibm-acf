@@ -43,6 +43,9 @@ struct CeLoginCreateHsfArgsV1
     std::string mPassword;
     PasswordHashAlgorithm mPasswordHashAlgorithm;
     std::vector<uint8_t> mPrivateKey;
+    std::size_t mSaltLength;
+    std::size_t mHashedAuthCodeLength;
+    std::size_t mIterations;
 };
 
 struct CeLoginDecryptedHsfArgsV1
@@ -53,6 +56,8 @@ struct CeLoginDecryptedHsfArgsV1
     std::string mExpirationDate;
     std::string mRequestId;
     std::string mPasswordHash;
+    std::string mSalt;
+    int mIterations;
 };
 
 CeLoginRc createCeLoginAcfV1(const CeLoginCreateHsfArgsV1& argsParm,

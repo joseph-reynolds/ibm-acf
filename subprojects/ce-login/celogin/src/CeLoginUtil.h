@@ -24,7 +24,8 @@ enum
 {
     CeLogin_Acf_NID = NID_sha512WithRSAEncryption,
     CeLogin_DigestLength = SHA512_DIGEST_LENGTH,
-    CeLogin_PasswordHashLength = SHA512_DIGEST_LENGTH,
+    CeLogin_MaxHashedAuthCodeLength = 128,
+    CeLogin_MaxHashedAuthCodeSaltLength = 128,
 
     CeLogin_MaxNumberOfJsonTokens = 128, // somewhat arbitrary right now
 };
@@ -55,8 +56,12 @@ CeLoginRc createDigest(const uint8_t* inputDataParm,
 
 CeLoginRc createPasswordHash(const char* inputDataParm,
                              const uint64_t inputDataLengthParm,
+                             const uint8_t* inputSaltParm,
+                             const uint64_t inputSaltLengthParm,
+                             const uint64_t iterationsParm,
                              uint8_t* outputHashParm,
-                             const uint64_t outputHashSizeParm);
+                             const uint64_t outputHashSizeParm,
+                             const uint64_t requestedOutputLengthParm);
 
 CeLoginRc getUnsignedIntegerFromString(const char* stringParm,
                                        const uint64_t stringLengthParm,
