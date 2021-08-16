@@ -21,7 +21,7 @@ enum
 {
     CeLoginInvalidVersion = 0,
     CeLoginVersion1 = 1,
-    CeLogin_PBKDF2_Iterations = 10000,
+    CeLogin_PBKDF2_Iterations = 100000,
 };
 
 struct CeLoginRc
