@@ -40,8 +40,8 @@
 #else
 #include <sdbusplus/bus.hpp>
 #define ACF_FILE_PATH "/etc/acf/service.acf"
-#define PROD_PUB_KEY_FILE_PATH "/etc/acf/ibmacf-prod.key"
-#define DEV_PUB_KEY_FILE_PATH "/etc/acf/ibmacf-dev.key"
+#define PROD_PUB_KEY_FILE_PATH "/srv/ibm-acf/ibmacf-prod.key"
+#define DEV_PUB_KEY_FILE_PATH "/srv/ibm-acf/ibmacf-dev.key"
 #endif
 
 // DBUS definitions for getting host's serial number property
