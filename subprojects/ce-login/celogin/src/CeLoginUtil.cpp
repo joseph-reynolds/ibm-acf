@@ -308,7 +308,15 @@ CeLogin::CeLoginRc CeLogin::createPasswordHash(
     {
         sRc = CeLoginRc::CreatePasswordHash_InvalidOutputBuffer;
     }
+    else if (0 == outputHashSizeParm)
+    {
+        sRc = CeLoginRc::CreatePasswordHash_InvalidOutputBufferLength;
+    }
     else if (outputHashSizeParm < requestedOutputLengthParm)
+    {
+        sRc = CeLoginRc::CreatePasswordHash_InvalidOutputBufferLength;
+    }
+    else if (0 == requestedOutputLengthParm)
     {
         sRc = CeLoginRc::CreatePasswordHash_InvalidOutputBufferLength;
     }
