@@ -1,11 +1,13 @@
 
 #include "CeLoginCli.h"
+#include "CliUnitTest.h"
+
 #include <CeLogin.h>
 #include <getopt.h>
+#include <inttypes.h>
 #include <string.h>
 #include <unistd.h> // getopt
 
-#include <inttypes.h>
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -37,8 +39,7 @@ int main(int argc, char** argv)
         else if (0 == strcmp(argv[1], "test"))
         {
             sPrintHelp = false;
-            std::cout << "UT Framework Unimplemented" << std::endl;
-            // TODO: Call test framework
+            cli::unit_test_main(argc, argv);
         }
     }
 

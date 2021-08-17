@@ -57,6 +57,7 @@ cli_sources = [ 'cli/CliCeLoginV1.cpp',
                 'cli/CliUtils.cpp',
                 'cli/CliVerifyHsf.cpp',
                 'cli/main.cpp',
+                'cli/CliUnitTest.cpp',
                 ]
 
 all_srcs = ce_login_sources + cli_sources
