@@ -17,6 +17,15 @@ enum ProcessorGeneration
 
 struct Machine
 {
+    Machine() : mSerialNumber(), mAuth(ServiceAuth_None), mProc(Invalid)
+    {}
+
+    Machine(const std::string& serialNumberParm,
+            const CeLogin::ServiceAuthority authParm,
+            const ProcessorGeneration procGenParm) :
+        mSerialNumber(serialNumberParm),
+        mAuth(authParm), mProc(procGenParm)
+    {}
     std::string mSerialNumber;
     CeLogin::ServiceAuthority mAuth;
     ProcessorGeneration mProc;

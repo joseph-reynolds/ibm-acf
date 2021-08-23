@@ -54,7 +54,7 @@ static CeLoginRc ParseAuthorityFromMachineArrayToken(
 static CeLoginRc ParseHashedAuthCodeFromToken(
     const JsmnUtils::JsmnState& jsmnStateParm,
     const uint64_t hashedAuthCodeTokenIdxParm, uint8_t* hashedAuthCodeParm,
-    const uint64_t hashedAuthCodeSizeParm, uint64_t bytesWrittenParm);
+    const uint64_t hashedAuthCodeSizeParm, uint64_t& bytesWrittenParm);
 
 static CeLoginRc ParseSaltFromToken(const JsmnUtils::JsmnState& jsmnStateParm,
                                     const uint64_t saltTokenIdxParm,
@@ -411,7 +411,7 @@ CeLoginRc ParseAuthorityFromMachineArrayToken(
 CeLoginRc ParseHashedAuthCodeFromToken(
     const JsmnUtils::JsmnState& jsmnStateParm,
     const uint64_t hashedAuthCodeTokenIdxParm, uint8_t* hashedAuthCodeParm,
-    const uint64_t hashedAuthCodeSizeParm, uint64_t bytesWrittenParm)
+    const uint64_t hashedAuthCodeSizeParm, uint64_t& bytesWrittenParm)
 {
     CeLoginRc sRc = CeLoginRc::Success;
     bytesWrittenParm = 0;

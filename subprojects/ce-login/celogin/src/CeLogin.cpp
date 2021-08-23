@@ -27,17 +27,53 @@ CeLogin::CeLoginRc CeLogin::getServiceAuthorityV1(
     uint8_t sGeneratedAuthCode[CeLogin_MaxHashedAuthCodeLength];
 
     CELoginSequenceV1* sDecodedAsn = NULL;
+    CeLoginJsonData* sJsonData = NULL;
+
+    if (!accessControlFileParm)
+    {
+        sRc = CeLoginRc::GetSevAuth_InvalidAcfPtr;
+    }
+    else if (0 == accessControlFileLengthParm)
+    {
+        sRc = CeLoginRc::GetSevAuth_InvalidAcfLength;
+    }
+    else if (!passwordParm)
+    {
+        sRc = CeLoginRc::GetSevAuth_InvalidPasswordPtr;
+    }
+    else if (0 == passwordLengthParm)
+    {
+        sRc = CeLoginRc::GetSevAuth_InvalidPasswordLength;
+    }
+    else if (!publicKeyParm)
+    {
+        sRc = CeLoginRc::GetSevAuth_InvalidPublicKeyPtr;
+    }
+    else if (0 == publicKeyLengthParm)
+    {
+        sRc = CeLoginRc::GetSevAuth_InvalidPublicKeyLength;
+    }
+    else if (!serialNumberParm)
+    {
+        sRc = CeLoginRc::GetSevAuth_InvalidSerialNumberPtr;
+    }
+    else if (0 == serialNumberLengthParm)
+    {
+        sRc = CeLoginRc::GetSevAuth_InvalidSerialNumberLength;
+    }
 
     // Allocate on heap to avoid blowing the stack
-    CeLoginJsonData* sJsonData =
-        (CeLoginJsonData*)OPENSSL_malloc(sizeof(CeLoginJsonData));
-    if (sJsonData)
+    if (CeLoginRc::Success == sRc)
     {
-        memset(sJsonData, 0x00, sizeof(CeLoginJsonData));
-    }
-    else
-    {
-        sRc = CeLoginRc::JsonDataAllocationFailure;
+        sJsonData = (CeLoginJsonData*)OPENSSL_malloc(sizeof(CeLoginJsonData));
+        if (sJsonData)
+        {
+            memset(sJsonData, 0x00, sizeof(CeLoginJsonData));
+        }
+        else
+        {
+            sRc = CeLoginRc::JsonDataAllocationFailure;
+        }
     }
 
     // Stack copy to store the parsed expiration time into. Only pass back

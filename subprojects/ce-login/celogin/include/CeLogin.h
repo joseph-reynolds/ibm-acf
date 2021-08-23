@@ -122,6 +122,16 @@ struct CeLoginRc
         GetAuthFromFrameworkEc_InvalidParm = 0xC0,
         GetAuthFromFrameworkEc_InvalidFrameworkEc = 0xC1,
 
+        GetSevAuth_InvalidAcfPtr = 0xD0,
+        GetSevAuth_InvalidAcfLength = 0xD1,
+        GetSevAuth_InvalidPasswordPtr = 0xD2,
+        GetSevAuth_InvalidPasswordLength = 0xD3,
+        GetSevAuth_InvalidPublicKeyPtr = 0xD4,
+        GetSevAuth_InvalidPublicKeyLength = 0xD5,
+        GetSevAuth_InvalidSerialNumberPtr = 0xD6,
+        GetSevAuth_InvalidSerialNumberLength = 0xD7,
+
+
         // Must fit in 1-byte
     };
 
