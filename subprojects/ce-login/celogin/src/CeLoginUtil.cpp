@@ -235,7 +235,7 @@ CeLogin::CeLoginRc CeLogin::decodeAndVerifyAcf(
     {
         // returns 1 on successful verification
         int sRsaResult = RSA_verify(
-            CeLogin_Acf_NID, sHashReceivedJson, sizeof(sHashReceivedJson),
+            CeLogin_Digest_NID, sHashReceivedJson, sizeof(sHashReceivedJson),
             decodedAsnParm->signature->data, decodedAsnParm->signature->length,
             sPublicKey);
         if (1 != sRsaResult)
