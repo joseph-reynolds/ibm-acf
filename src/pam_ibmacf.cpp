@@ -27,7 +27,6 @@
 #include <variant>
 #include <vector>
 
-#define FAILURE -1
 #define SOURCE_FILE_VERSION 1
 #define UNSET_SERIAL_NUM_KEYWORD "UNSET"
 
@@ -49,10 +48,6 @@
 #define DBUS_INVENTORY_ASSET_INTERFACE                                         \
     "xyz.openbmc_project.Inventory.Decorator.Asset"
 #define DBUS_SERIAL_NUM_PROP "SerialNumber"
-
-#define DBUS_SOFTWARE_OBJECT "/xyz/openbmc_project/software"
-#define DBUS_FIELDMODE_INTERFACE "xyz.openbmc_project.Control.FieldMode"
-#define DBUS_FIELD_MODE_PROP "FieldModeEnabled"
 
 const char* default_user = "service";
 
@@ -265,38 +260,49 @@ void setSerialNumberProperty(const string& obj){
     mSerialNumber = obj;
 }
 #else
-int readFieldModeProperty(const string& obj, const string& inf,
-                          const string& prop, pam_handle_t* pamh)
+int readFieldMode(pam_handle_t* pamh)
 {
-    bool propBool = false;
-    std::string object = obj;
-    auto bus = sdbusplus::bus::new_default();
-    auto properties = bus.new_method_call(
-        "xyz.openbmc_project.Software.BMC.Updater", object.c_str(),
-        "org.freedesktop.DBus.Properties", "Get");
-    properties.append(inf);
-    properties.append(prop);
-    try
+    FILE* pipe = popen("fw_printenv -n fieldmode 2>&1", "r");
+    if (!pipe)
     {
-        auto result = bus.call(properties);
-        if (!result.is_method_error())
+        pam_syslog(pamh, LOG_ERR, "popen failed\n");
+        return PAM_SYSTEM_ERR;
+    }
+    std::array<char, 512> buffer;
+    std::stringstream result;
+    while (fgets(buffer.data(), buffer.size(), pipe) != nullptr)
+    {
+        result << buffer.data();
+    }
+    int stat = pclose(pipe);
+    if (WIFEXITED(stat))
+    {
+        // Handle expected results
+        int rc = WEXITSTATUS(stat);
+        if (rc == 0)
         {
-            std::variant<bool> val{false};
-            result.read(val);
-            if (auto pVal = std::get_if<bool>(&val))
+            // fw_printenv exited normally with rc=0
+            if (0 == strcmp(result.str().c_str(), "true\n"))
             {
-                pam_syslog(pamh, LOG_DEBUG, "FieldModeProperty = %d\n", (*pVal));
-                propBool = (*pVal);
+                pam_syslog(pamh, LOG_ERR, "fieldmode=true");
+                return 1; // fieldmode=true
             }
+            pam_syslog(pamh, LOG_ERR, "fieldmode not true");
+            return 0; // any other value means fieldmode=false
+        }
+        // fw_printenv exited normally with nonzero rc
+        if (0 == strcmp(result.str().c_str(),
+                        "## Error: \"fieldmode\" not defined\n"))
+        {
+            pam_syslog(pamh, LOG_ERR, "fieldmode not set");
+            return 0; // fieldmode not set means fieldmode=false
         }
     }
-    catch (const std::exception& exc)
-    {
-        pam_syslog(pamh, LOG_ERR, "dbus call failure: %s\n", exc.what());
-        return FAILURE;
-    }
-
-    return (int)propBool;
+    // Something unexpected happened, possibly fw_printenv exited abnormally,
+    // or gave unexpected results, or something else unexpected happened
+    pam_syslog(pamh, LOG_ERR, "pclose failed stat=%d, message=%s\n",
+               stat, result.str().c_str());
+    return PAM_SYSTEM_ERR; // unable to read, default to fieldmode=true
 }
 
 string readMachineSerialNumberProperty(const string& obj, const string& inf,
@@ -406,14 +412,12 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t* pamh, int flags, int argc,
 
         // Only check for development key if BMC is not in field mode
 #ifndef RUN_UNIT_TESTS
-        int fieldModeEnabled = readFieldModeProperty(
-            DBUS_SOFTWARE_OBJECT, DBUS_FIELDMODE_INTERFACE,
-            DBUS_FIELD_MODE_PROP, pamh);
+        int fieldModeEnabled = readFieldMode(pamh);
 #endif
-        if (fieldModeEnabled == FAILURE)
+        if (fieldModeEnabled == PAM_SYSTEM_ERR)
         {
             pam_syslog(pamh, LOG_ERR,
-                       "Could not get field mode enabled property\n");
+                       "Could not read fieldmode value\n");
             return PAM_SYSTEM_ERR;
         }
 
