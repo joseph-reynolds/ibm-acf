@@ -285,17 +285,17 @@ int readFieldMode(pam_handle_t* pamh)
             // fw_printenv exited normally with rc=0
             if (0 == strcmp(result.str().c_str(), "true\n"))
             {
-                pam_syslog(pamh, LOG_ERR, "fieldmode=true");
+                pam_syslog(pamh, LOG_DEBUG, "fieldmode=true");
                 return 1; // fieldmode=true
             }
-            pam_syslog(pamh, LOG_ERR, "fieldmode not true");
+            pam_syslog(pamh, LOG_DEBUG, "fieldmode not true");
             return 0; // any other value means fieldmode=false
         }
         // fw_printenv exited normally with nonzero rc
         if (0 == strcmp(result.str().c_str(),
                         "## Error: \"fieldmode\" not defined\n"))
         {
-            pam_syslog(pamh, LOG_ERR, "fieldmode not set");
+            pam_syslog(pamh, LOG_DEBUG, "fieldmode not set");
             return 0; // fieldmode not set means fieldmode=false
         }
     }
