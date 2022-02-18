@@ -1,5 +1,3 @@
-#include <chrono>
-#include <ctime>
 #include "CeLoginCli.h"
 #include "CliCeLoginV1.h"
 #include "CliUtils.h"
@@ -30,9 +28,13 @@ struct CreateArguments
     string mPrivateKeyFile;
     string mOutputFile;
     string mPasswordHashAlgorithm;
+    size_t mIterations;
     bool mVerbose;
     bool mHelp;
-    CreateArguments() : mVerbose(false), mHelp(false)
+    CreateArguments() :
+        mIterations(CeLogin::CeLogin_PBKDF2_Iterations), mVerbose(false),
+        mHelp(false)
+
     {}
 };
 
@@ -44,6 +46,7 @@ enum CreateOptOptions
     PrivateKeyFile,
     OutputFile,
     PasswordHashAlgorithm,
+    Iterations,
     Help,
     Verbose,
     NOptOptions
@@ -56,6 +59,7 @@ struct option create_long_options[NOptOptions + 1] = {
     {"pkey", required_argument, NULL, 'k'},
     {"output", required_argument, NULL, 'o'},
     {"algorithm", required_argument, NULL, 'a'},
+    {"iterations", required_argument, NULL, 'n'},
     {"help", no_argument, NULL, 'h'},
     {"verbose", no_argument, NULL, 'v'},
     {0, 0, 0, 0}};
@@ -67,6 +71,7 @@ string create_options_description[NOptOptions] = {
     "PrivateKeyFile",
     "OutputFile",
     "<sha512|prod> - Password Hash Algorithm : default prod",
+    "Number of iterations in PBKDF2 routine",
     "Help",
     "Verbose"};
 
@@ -182,6 +187,10 @@ void createParseArgs(int argc, char** argv, struct CreateArguments& args)
             sNumOfRequiredArgumentsFound++;
             args.mPasswordHashAlgorithm = optarg;
         }
+        else if (c == create_long_options[Iterations].val)
+        {
+            args.mIterations = std::stoi(optarg);
+        }
         else if (c == create_long_options[Help].val)
         {
             args.mHelp = true;
@@ -220,6 +229,11 @@ bool createValidateArgs(const CreateArguments& args)
     {
         sIsValidArgs = false;
         cout << "Error: Missing OutputFilePath" << endl;
+    }
+    if (args.mIterations <= 0)
+    {
+        sIsValidArgs = false;
+        cout << "Error: Invalid number of iterations" << endl;
     }
     return sIsValidArgs;
 }
@@ -284,7 +298,7 @@ CeLogin::CeLoginRc cli::createHsf(int argc, char** argv)
 
         sCreateHsfArgs.mHashedAuthCodeLength = 512 / 8;
         sCreateHsfArgs.mSaltLength = 512 / 8;
-        sCreateHsfArgs.mIterations = CeLogin::CeLogin_PBKDF2_Iterations;
+        sCreateHsfArgs.mIterations = sArgs.mIterations;
 
         vector<uint8_t> sKey;
 
@@ -320,9 +334,9 @@ CeLogin::CeLoginRc cli::createHsf(int argc, char** argv)
 
         vector<uint8_t> sAcfBinary;
         sRc = CeLogin::createCeLoginAcfV1(sCreateHsfArgs, sAcfBinary);
-        //cout << "RC: " << hex << (int)sRc << endl;
+        // cout << "RC: " << hex << (int)sRc << endl;
 
-        //cout << sAcfBinary.size() << endl;
+        // cout << sAcfBinary.size() << endl;
 
         if (!writeBinaryFile(sArgs.mOutputFile, sAcfBinary.data(),
                              sAcfBinary.size()))

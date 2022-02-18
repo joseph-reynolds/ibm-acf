@@ -5,16 +5,25 @@
 MYPATH=$(dirname $(readlink -f $(which $0)));
 BMC="$1"
 PASSWD="$2"
+ITERATIONS="$3"
 ADMINID=admin
 ACF=/tmp/${USER}_$$.acf
 
 if [ "X${BMC}" = "X" ] ; then
-    echo "uploadDevAcf <BMC IP> [<BMC PASSWD>]"
+    echo "uploadDevAcf <BMC IP> [<BMC PASSWD>] [<PBKDF2 iterations>]"
     exit 1
 fi
 
 if [ "X${PASSWD}" = "X" ]; then
     PASSWD="0penBmc"
+fi
+
+if [ "X${ITERATIONS}" = "X" ]; then
+    # celogin_cli will use a default value for iterations if no value is
+    # provided
+    ITERATIONS=""
+else
+    ITERATIONS="-n ${ITERATIONS}"
 fi
 
 ARCH="P10"
@@ -61,7 +70,7 @@ if [ -e $MYPATH/build/celogin_cli ]; then
     CESCRIPT=$MYPATH/build/celogin_cli
 fi
 
-$CESCRIPT create -m "${ARCH},dev,${SERIAL}" -p "${PASSWD}" -e 2040-01-01 -k ${SIGNINGKEY} -o ${ACF}
+$CESCRIPT create -m "${ARCH},dev,${SERIAL}" -p "${PASSWD}" -e 2040-01-01 -k ${SIGNINGKEY} -o ${ACF} ${ITERATIONS}
 if [ $? != 0 ]; then
     echo "**** ERROR : Unable to create the ACF"
     exit 1
