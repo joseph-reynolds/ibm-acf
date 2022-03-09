@@ -132,6 +132,14 @@ std::map<int, std::string> mapping = {
 
     {0xC0, "GetAuthFromFrameworkEc_InvalidParm"},
 };
+enum verifyACFErrors
+{
+    verifyACF_NotInvoked = -1,
+    verifyACF_FailedReadingACF = -2,
+    verifyACF_FailedReadingKey = -3,
+};
+
+
 // Determine the user name of the auth attempt.
 // Returns:
 //    PAM_SUCCESS for the special service user.
@@ -190,6 +198,7 @@ bool readBinaryFile(const std::string fileNameParm,
     return false;
 }
 
+// Return value: one of verifyACFErrors or CeLogin::CeLoginRc.mReason
 int verifyACF(string acfPubKeypath, const char* passwordParm, string mSerialNumber,
               pam_handle_t* pamh)
 {
@@ -220,29 +229,18 @@ int verifyACF(string acfPubKeypath, const char* passwordParm, string mSerialNumb
                 timeSinceUnixEpocInSecondsParm, publicKeyParm,
                 publicKeyLengthParm, serialNumberParm, serialNumberLengthParm,
                 sAuth, sExpiration);
-            if (CeLoginRc::Success == sRc)
-            {
-                return PAM_SUCCESS;
-            }
-            else
-            {
-                pam_syslog(pamh, LOG_WARNING, "Error number: 0x%X\n",
-                           (int)sRc.mReason);
-                pam_syslog(pamh, LOG_WARNING, "Error message: %s\n",
-                           (mapping.at((int)sRc.mReason)).c_str());
-                return PAM_AUTH_ERR;
-            }
+            return sRc.mReason;
         }
         else
         {
-            pam_syslog(pamh, LOG_WARNING, "failed reading public key.\n");
-            return PAM_SYSTEM_ERR;
+            // A log entry was already sent for this
+            return verifyACF_FailedReadingKey;
         }
     }
     else
     {
-        pam_syslog(pamh, LOG_WARNING, "failed reading ACF.\n");
-        return PAM_SYSTEM_ERR;
+        // A log entry was already sent for this
+        return verifyACF_FailedReadingACF;
     }
     return PAM_SUCCESS;
 }
@@ -285,25 +283,22 @@ int readFieldMode(pam_handle_t* pamh)
             // fw_printenv exited normally with rc=0
             if (0 == strcmp(result.str().c_str(), "true\n"))
             {
-                pam_syslog(pamh, LOG_DEBUG, "fieldmode=true");
                 return 1; // fieldmode=true
             }
-            pam_syslog(pamh, LOG_DEBUG, "fieldmode not true");
             return 0; // any other value means fieldmode=false
         }
         // fw_printenv exited normally with nonzero rc
         if (0 == strcmp(result.str().c_str(),
                         "## Error: \"fieldmode\" not defined\n"))
         {
-            pam_syslog(pamh, LOG_DEBUG, "fieldmode not set");
             return 0; // fieldmode not set means fieldmode=false
         }
     }
-    // Something unexpected happened, possibly fw_printenv exited abnormally,
-    // or gave unexpected results, or something else unexpected happened
-    pam_syslog(pamh, LOG_ERR, "pclose failed stat=%d, message=%s\n",
+    // Something unexpected happened.  Either fw_printenv exited abnormally,
+    // or gave unexpected results, or something else unexpected happened.
+    pam_syslog(pamh, LOG_ERR, "pclose failed stat=0x%X, message=%s\n",
                stat, result.str().c_str());
-    return PAM_SYSTEM_ERR; // unable to read, default to fieldmode=true
+    return -1; // This should never happen
 }
 
 string readMachineSerialNumberProperty(const string& obj, const string& inf,
@@ -338,7 +333,7 @@ string readMachineSerialNumberProperty(const string& obj, const string& inf,
     catch (const std::exception& exc)
     {
         pam_syslog(pamh, LOG_ERR,
-                   "dbus call for getting serial number failured: %s\n",
+                   "dbus call for getting serial number failed: %s\n",
                    exc.what());
         propSerialNum = "";
     }
@@ -376,12 +371,9 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t* pamh, int flags, int argc,
         return PAM_AUTH_ERR;
     }
 
-    const char* user_parm = default_user;
     string acfDevPubKeypath = (DEV_PUB_KEY_FILE_PATH);
     string acfProdPubKeypath = (PROD_PUB_KEY_FILE_PATH);
     string acfProdBackupPubKeypath = (PROD_BACKUP_PUB_KEY_FILE_PATH);
-    pam_syslog(pamh, LOG_INFO, "Performing ACF auth for the %s user.\n",
-               user_parm);
 
     // Get host's serial number
 #ifndef RUN_UNIT_TESTS
@@ -394,55 +386,72 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t* pamh, int flags, int argc,
     {
         mSerialNumber = UNSET_SERIAL_NUM_KEYWORD;
     }
-    pam_syslog(pamh, LOG_INFO, "Host Serial Number = %s\n",
-               mSerialNumber.c_str());
 
-    int verifyRc = PAM_AUTH_ERR;
-
-    // Assume this is a production key then check for development if not prod
-    // key
-    verifyRc = verifyACF(acfProdPubKeypath, password, mSerialNumber, pamh);
-
-    if (verifyRc == PAM_SUCCESS)
+    // Check the ACF with the production key.  There are three outcomes:
+    //  1. Successful authentication.  Stop trying.
+    //  2. Failure because cannot verify signature.  Try next signature.
+    //  3. Failure because something else is wrong.  Stop trying.
+    int sRc = verifyACF(acfProdPubKeypath, password, mSerialNumber, pamh);
+    int sRc1 = sRc;
+    int sRc2 = verifyACF_NotInvoked;
+    int sRc3 = verifyACF_NotInvoked;
+    int fieldMode = -1;
+    if ((sRc == CeLoginRc::SignatureNotValid) || (sRc == verifyACF_FailedReadingKey))
     {
-        pam_syslog(pamh, LOG_INFO,
-                   "Production ACF authentication completed successfully\n");
-        return PAM_SUCCESS;
-    }
+        // Check the ACF with the backup production key.
+        sRc = verifyACF(acfProdBackupPubKeypath, password, mSerialNumber, pamh);
+        sRc2 = sRc;
 
-    verifyRc = verifyACF(acfProdBackupPubKeypath, password, mSerialNumber, pamh);
-
-    if (verifyRc == PAM_SUCCESS)
-    {
-        pam_syslog(pamh, LOG_INFO,
-                   "Production Backup ACF authentication completed successfully\n");
-        return PAM_SUCCESS;
-    }
-
-    // Only check for development key if BMC is not in field mode
-#ifndef RUN_UNIT_TESTS
-    int fieldModeEnabled = readFieldMode(pamh);
-#endif
-    if (fieldModeEnabled == PAM_SYSTEM_ERR)
-    {
-        pam_syslog(pamh, LOG_ERR,
-                   "Could not read fieldmode value\n");
-        return PAM_SYSTEM_ERR;
-    }
-
-    if (fieldModeEnabled == 0)
-    {
-        verifyRc =
-            verifyACF(acfDevPubKeypath, password, mSerialNumber, pamh);
-        if (verifyRc == PAM_SUCCESS)
+        // If field mode is disabled, check the ACF with the development key.
+        if ((sRc == CeLoginRc::SignatureNotValid) || (sRc == verifyACF_FailedReadingKey))
         {
-            pam_syslog(
-                pamh, LOG_INFO,
-                "Development ACF authentication completed successfully\n");
-            return PAM_SUCCESS;
+            // Read the field mode value.
+#ifndef RUN_UNIT_TESTS
+            int fieldModeEnabled = readFieldMode(pamh);
+#endif
+            fieldMode = fieldModeEnabled;
+            if (fieldModeEnabled == -1)
+            {
+                pam_syslog(pamh, LOG_ERR,
+                           "Could not read fieldmode value\n");
+                // Continue securely: as if field mode is enabled
+                fieldModeEnabled = 1;
+            }
+            if (fieldModeEnabled == 0)
+            {
+                sRc = verifyACF(acfDevPubKeypath, password, mSerialNumber, pamh);
+                sRc3 = sRc;
+            }
         }
     }
-    return verifyRc;
+
+    if (sRc == CeLoginRc::Success)
+    {
+        return PAM_SUCCESS;
+    }
+
+    // Log the error
+    const char* errMsg = "";
+    auto errIter = mapping.find(sRc);
+    if (errIter != mapping.end())
+    {
+        errMsg = errIter->second.c_str();
+    }
+    if (sRc == verifyACF_FailedReadingACF)
+    {
+        errMsg = "FailedReadingACF";
+    }
+    pam_syslog(pamh, LOG_WARNING, "ACF service auth failed 0x%X: %s"
+               " (serial=%s, sRc1=0x%X, sRc2=0x%0x, sRc3=0x%X)",
+               sRc, errMsg, mSerialNumber.c_str(), sRc1, sRc2, sRc3);
+           
+    if (sRc == verifyACF_FailedReadingACF || sRc == CeLoginRc::SignatureNotValid ||
+        sRc == CeLoginRc::PasswordNotValid || sRc == CeLoginRc::AcfExpired ||
+        sRc == CeLoginRc::SerialNumberMismatch)
+    {
+        return PAM_AUTH_ERR;
+    }
+    return PAM_SYSTEM_ERR;
 }
 
 PAM_EXTERN int pam_sm_setcred(pam_handle_t* pamh, int flags, int argc,
