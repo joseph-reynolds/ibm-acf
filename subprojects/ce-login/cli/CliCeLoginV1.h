@@ -75,6 +75,21 @@ CeLoginRc createCeLoginAcfV1(const CeLoginCreateHsfArgsV1& argsParm,
                              std::vector<uint8_t>& generatedAcfParm);
 
 CeLoginRc
+    createCeLoginAcfV1Payload(const CeLoginCreateHsfArgsV1& argsParm,
+                              std::string& generatedAcfParm,
+                              std::vector<uint8_t>& generatedPayloadHashParm);
+
+CeLoginRc
+    createCeLoginAcfV1Signature(const CeLoginCreateHsfArgsV1& argsParm,
+                                const std::vector<uint8_t>& jsonDigestParm,
+                                std::vector<uint8_t>& generatedSignatureParm);
+
+CeLoginRc createCeLoginAcfV1Asn1(const CeLoginCreateHsfArgsV1& argsParm,
+                                 const std::string& jsonParm,
+                                 const std::vector<uint8_t>& signatureParm,
+                                 std::vector<uint8_t>& generatedAcfParm);
+
+CeLoginRc
     decodeAndVerifyCeLoginHsfV1(const std::vector<uint8_t>& hsfParm,
                                 const std::vector<uint8_t>& publicKeyParm,
                                 CeLoginDecryptedHsfArgsV1& decodedHsfParm);
