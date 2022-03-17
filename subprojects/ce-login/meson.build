@@ -1,8 +1,14 @@
-project('ce-login',
-        'cpp',
-         version : '1.0.0',
-         default_options : 'default_library=static'
-         )
+project(
+    'ce-login',
+    'cpp',
+    version : '1.0.0',
+    default_options :
+    [
+        'default_library=static',
+        'c_std=c11',
+        'cpp_std=c++11'
+    ]
+)
 
 #dependencies
 cxx = meson.get_compiler('cpp')
@@ -13,24 +19,38 @@ openssl_include_dir = '/usr/include/openssl'
 #if pkgconfig and find_library calls fail
 cwd = meson.current_source_dir()
 
-libcrypto = dependency('libcrypto', required : false)
-if not libcrypto.found()
-  libcrypto = cxx.find_library('crypto', required : false )
-  if not libcrypto.found()
-    #Last resort to build with libcrypto
-    crypto_inc = include_directories ( openssl_include_dir )
-    libcrypto = declare_dependency( link_args : [ '-L' + cwd, '-lcrypto' ], include_directories : crypto_inc )
-  endif
+if not get_option('openssl-compat')
+    libcrypto = dependency('libcrypto', required : false, version : '>=1.1.1k')
+    if not libcrypto.found()
+      libcrypto = cxx.find_library('crypto', required : false, version : '>=1.1.1k')
+      if not libcrypto.found()
+        #Last resort to build with libcrypto
+        crypto_inc = include_directories ( openssl_include_dir )
+        libcrypto = declare_dependency( link_args : [ '-L' + cwd, '-lcrypto' ], include_directories : crypto_inc )
+      endif
+    endif
+else
+    libcrypto = dependency('libcrypto11', required : false, version : '>=1.1.1k')
+    if not libcrypto.found()
+      libcrypto = cxx.find_library('crypto11', required : false, version : '>=1.1.1k' )
+    endif
 endif
 
-libssl = dependency('libssl', required : false)
-if not libssl.found()
-  libssl = cxx.find_library('ssl', required : false)
-  if not libssl.found()
-    #Last resort to build with libssl
-    crypto_inc = include_directories ( openssl_include_dir )
-    libssl = declare_dependency( link_args : [ '-L',  '-lssl' ], include_directories : crypto_inc )
-  endif
+if not get_option('openssl-compat')
+    libssl = dependency('libssl', required : false, version : '>=1.1.1k')
+    if not libssl.found()
+      libssl = cxx.find_library('ssl', required : false, version : '>=1.1.1k')
+      if not libssl.found()
+        #Last resort to build with libssl
+        crypto_inc = include_directories ( openssl_include_dir )
+        libssl = declare_dependency( link_args : [ '-L',  '-lssl' ], include_directories : crypto_inc )
+      endif
+    endif
+else
+    libssl = dependency('libssl11', required : false, version : '>=1.1.1k')
+    if not libcrypto.found()
+      libssl = cxx.find_library('ssl11', required : false, version : '>=1.1.1k' )
+    endif
 endif
 
 #Fetches jsmn header library
