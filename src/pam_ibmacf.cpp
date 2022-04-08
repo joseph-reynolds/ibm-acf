@@ -41,6 +41,7 @@
 #define ACF_FILE_PATH "/etc/acf/service.acf"
 #define PROD_PUB_KEY_FILE_PATH "/srv/ibm-acf/ibmacf-prod.key"
 #define PROD_BACKUP_PUB_KEY_FILE_PATH "/srv/ibm-acf/ibmacf-prod-backup.key"
+#define PROD_BACKUP2_PUB_KEY_FILE_PATH "/srv/ibm-acf/ibmacf-prod-backup2.key"
 #define DEV_PUB_KEY_FILE_PATH "/srv/ibm-acf/ibmacf-dev.key"
 #endif
 
@@ -374,6 +375,7 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t* pamh, int flags, int argc,
     string acfDevPubKeypath = (DEV_PUB_KEY_FILE_PATH);
     string acfProdPubKeypath = (PROD_PUB_KEY_FILE_PATH);
     string acfProdBackupPubKeypath = (PROD_BACKUP_PUB_KEY_FILE_PATH);
+    string acfProdBackup2PubKeypath = (PROD_BACKUP2_PUB_KEY_FILE_PATH);
 
     // Get host's serial number
 #ifndef RUN_UNIT_TESTS
@@ -395,6 +397,7 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t* pamh, int flags, int argc,
     int sRc1 = sRc;
     int sRc2 = verifyACF_NotInvoked;
     int sRc3 = verifyACF_NotInvoked;
+    int sRc4 = verifyACF_NotInvoked;
     int fieldMode = -1;
     if ((sRc == CeLoginRc::SignatureNotValid) || (sRc == verifyACF_FailedReadingKey))
     {
@@ -402,25 +405,32 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t* pamh, int flags, int argc,
         sRc = verifyACF(acfProdBackupPubKeypath, password, mSerialNumber, pamh);
         sRc2 = sRc;
 
-        // If field mode is disabled, check the ACF with the development key.
         if ((sRc == CeLoginRc::SignatureNotValid) || (sRc == verifyACF_FailedReadingKey))
         {
-            // Read the field mode value.
+            // Check the ACF with the backup2 production key.
+            sRc = verifyACF(acfProdBackup2PubKeypath, password, mSerialNumber, pamh);
+            sRc3 = sRc;
+
+            // If field mode is disabled, check the ACF with the development key.
+            if ((sRc == CeLoginRc::SignatureNotValid) || (sRc == verifyACF_FailedReadingKey))
+            {
+                // Read the field mode value.
 #ifndef RUN_UNIT_TESTS
-            int fieldModeEnabled = readFieldMode(pamh);
+                int fieldModeEnabled = readFieldMode(pamh);
 #endif
-            fieldMode = fieldModeEnabled;
-            if (fieldModeEnabled == -1)
-            {
-                pam_syslog(pamh, LOG_ERR,
-                           "Could not read fieldmode value\n");
-                // Continue securely: as if field mode is enabled
-                fieldModeEnabled = 1;
-            }
-            if (fieldModeEnabled == 0)
-            {
-                sRc = verifyACF(acfDevPubKeypath, password, mSerialNumber, pamh);
-                sRc3 = sRc;
+                fieldMode = fieldModeEnabled;
+                if (fieldModeEnabled == -1)
+                {
+                    pam_syslog(pamh, LOG_ERR,
+                               "Could not read fieldmode value\n");
+                    // Continue securely: as if field mode is enabled
+                    fieldModeEnabled = 1;
+                }
+                if (fieldModeEnabled == 0)
+                {
+                    sRc = verifyACF(acfDevPubKeypath, password, mSerialNumber, pamh);
+                    sRc4 = sRc;
+                }
             }
         }
     }
@@ -442,8 +452,8 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t* pamh, int flags, int argc,
         errMsg = "FailedReadingACF";
     }
     pam_syslog(pamh, LOG_WARNING, "ACF service auth failed 0x%X: %s"
-               " (serial=%s, sRc1=0x%X, sRc2=0x%0x, sRc3=0x%X)",
-               sRc, errMsg, mSerialNumber.c_str(), sRc1, sRc2, sRc3);
+               " (serial=%s, sRc1=0x%X, sRc2=0x%0x, sRc3=0x%X, sRc4=0x%X)",
+               sRc, errMsg, mSerialNumber.c_str(), sRc1, sRc2, sRc3, sRc4);
            
     if (sRc == verifyACF_FailedReadingACF || sRc == CeLoginRc::SignatureNotValid ||
         sRc == CeLoginRc::PasswordNotValid || sRc == CeLoginRc::AcfExpired ||
