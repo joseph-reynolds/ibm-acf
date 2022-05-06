@@ -29,6 +29,7 @@
 
 #define SOURCE_FILE_VERSION 1
 #define UNSET_SERIAL_NUM_KEYWORD "UNSET"
+#define BLANK_SERIAL_NUMBER "       "
 
 //RUN_UNIT_TESTS should only be enabled when running
 //meson unit tests, otherwise this shoudn't be enabled
@@ -382,7 +383,7 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t* pamh, int flags, int argc,
         DBUS_SERIAL_NUM_PROP, pamh);
 #endif
     // If serial number is empty on machine set as UNSET for check with acf
-    if (mSerialNumber.empty())
+    if (mSerialNumber.empty() || (mSerialNumber == BLANK_SERIAL_NUMBER))
     {
         mSerialNumber = UNSET_SERIAL_NUM_KEYWORD;
     }
