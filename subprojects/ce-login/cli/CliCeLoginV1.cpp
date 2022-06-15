@@ -22,23 +22,18 @@
 #include <sstream>
 #include <vector>
 
-CeLogin::CeLoginRc
-    CeLogin::createCeLoginAcfV1(const CeLoginCreateHsfArgsV1& argsParm,
-                                std::vector<uint8_t>& generatedAcfParm)
+CeLogin::CeLoginRc CeLogin::createCeLoginAcfV1Payload(
+    const CeLoginCreateHsfArgsV1& argsParm, std::string& generatedJsonParm,
+    std::vector<uint8_t>& generatedPayloadHashParm)
 {
     CeLoginRc sRc = CeLoginRc::Success;
     std::string sPasswordHashHexString;
     std::string sSaltHexString;
 
-    std::string sJsonString;
-    std::vector<uint8_t> sJsonDigest(CeLogin::CeLogin_DigestLength);
     std::vector<uint8_t> sHashedAuthCode(argsParm.mHashedAuthCodeLength);
     std::vector<uint8_t> sSalt(argsParm.mSaltLength, 0);
-    std::vector<uint8_t> sJsonSignature;
 
     uint64_t sIterations = argsParm.mIterations;
-
-    CELoginSequenceV1* sHsfStruct = NULL;
 
     if (argsParm.mSourceFileName.empty() || argsParm.mMachines.empty() ||
         argsParm.mPassword.empty() || argsParm.mExpirationDate.empty() ||
@@ -173,7 +168,7 @@ CeLogin::CeLoginRc
 
             if (sGeneratedJsonString)
             {
-                sJsonString = std::string(sGeneratedJsonString);
+                generatedJsonParm = std::string(sGeneratedJsonString);
             }
             else
             {
@@ -227,42 +222,75 @@ CeLogin::CeLoginRc
         }
     }
 
-    if (CeLoginRc::Success == sRc && !sJsonString.empty())
+    if (CeLoginRc::Success == sRc && !generatedJsonParm.empty())
     {
-        sRc = createDigest((const uint8_t*)sJsonString.data(),
-                           sJsonString.length(), sJsonDigest.data(),
-                           sJsonDigest.size());
+        generatedPayloadHashParm =
+            std::vector<uint8_t>(CeLogin::CeLogin_DigestLength);
+
+        sRc = createDigest((const uint8_t*)generatedJsonParm.data(),
+                           generatedJsonParm.length(),
+                           generatedPayloadHashParm.data(),
+                           generatedPayloadHashParm.size());
     }
 
-    if (CeLoginRc::Success == sRc)
+    if (CeLoginRc::Success != sRc)
     {
-        const uint8_t* sConstPrivateKey = argsParm.mPrivateKey.data();
-        RSA* sPrivateKey = d2i_RSAPrivateKey(NULL, &sConstPrivateKey,
-                                             argsParm.mPrivateKey.size());
-        // TODO: Verify size matches expected size
-        if (sPrivateKey)
-        {
-            unsigned int sJsonSignatureSize = sJsonSignature.size();
-            sJsonSignature = std::vector<uint8_t>(RSA_size(sPrivateKey));
-            int sResult =
-                RSA_sign(CeLogin::CeLogin_Digest_NID, sJsonDigest.data(),
-                         sJsonDigest.size(), sJsonSignature.data(),
-                         &sJsonSignatureSize, sPrivateKey);
-            if (1 != sResult)
-            {
-                sRc = CeLoginRc::Failure;
-            }
-            else if (sJsonSignatureSize != sJsonSignature.size())
-            {
-                sRc = CeLoginRc::Failure;
-            }
-        }
+        generatedPayloadHashParm.clear();
+        generatedJsonParm.clear();
+    }
+    return sRc;
+}
 
-        if (sPrivateKey)
+CeLogin::CeLoginRc CeLogin::createCeLoginAcfV1Signature(
+    const CeLoginCreateHsfArgsV1& argsParm,
+    const std::vector<uint8_t>& jsonDigestParm,
+    std::vector<uint8_t>& generatedSignatureParm)
+{
+    CeLoginRc sRc = CeLoginRc::Success;
+    const uint8_t* sConstPrivateKey = argsParm.mPrivateKey.data();
+    RSA* sPrivateKey =
+        d2i_RSAPrivateKey(NULL, &sConstPrivateKey, argsParm.mPrivateKey.size());
+    // TODO: Verify size matches expected size
+    if (sPrivateKey)
+    {
+        unsigned int sJsonSignatureSize = 0;
+        generatedSignatureParm = std::vector<uint8_t>(RSA_size(sPrivateKey));
+        int sResult =
+            RSA_sign(CeLogin::CeLogin_Digest_NID, jsonDigestParm.data(),
+                     jsonDigestParm.size(), generatedSignatureParm.data(),
+                     &sJsonSignatureSize, sPrivateKey);
+        if (1 != sResult)
         {
-            RSA_free(sPrivateKey);
+            sRc = CeLoginRc::Failure;
+        }
+        else if (sJsonSignatureSize != generatedSignatureParm.size())
+        {
+            sRc = CeLoginRc::Failure;
         }
     }
+
+    if (sPrivateKey)
+    {
+        RSA_free(sPrivateKey);
+    }
+
+    if (sRc != CeLoginRc::Success)
+    {
+        generatedSignatureParm.clear();
+    }
+
+    return sRc;
+}
+
+CeLogin::CeLoginRc
+    CeLogin::createCeLoginAcfV1Asn1(const CeLoginCreateHsfArgsV1& argsParm,
+                                    const std::string& jsonParm,
+                                    const std::vector<uint8_t>& signatureParm,
+                                    std::vector<uint8_t>& generatedAcfParm)
+{
+    CeLoginRc sRc = CeLoginRc::Success;
+
+    CELoginSequenceV1* sHsfStruct = NULL;
 
     if (CeLoginRc::Success == sRc)
     {
@@ -274,11 +302,11 @@ CeLogin::CeLoginRc
                         argsParm.mSourceFileName.c_str(),
                         argsParm.mSourceFileName.size());
         ASN1_OCTET_STRING_set(sHsfStruct->sourceFileData,
-                              (const uint8_t*)sJsonString.data(),
-                              sJsonString.size());
+                              (const uint8_t*)jsonParm.data(), jsonParm.size());
         sHsfStruct->algorithm->id = OBJ_nid2obj(CeLogin::CeLogin_Acf_NID);
-        ASN1_BIT_STRING_set(sHsfStruct->signature, sJsonSignature.data(),
-                            sJsonSignature.size());
+        ASN1_BIT_STRING_set(sHsfStruct->signature,
+                            (uint8_t*)signatureParm.data(),
+                            signatureParm.size());
 
         std::vector<uint8_t> sHsfDerEncoded(2000);
         uint8_t* sDataPtr = sHsfDerEncoded.data();
@@ -297,6 +325,37 @@ CeLogin::CeLoginRc
         }
 
         CELoginSequenceV1_free(sHsfStruct);
+    }
+
+    if (sRc != CeLoginRc::Success)
+    {
+        generatedAcfParm.clear();
+    }
+
+    return sRc;
+}
+
+CeLogin::CeLoginRc
+    CeLogin::createCeLoginAcfV1(const CeLoginCreateHsfArgsV1& argsParm,
+                                std::vector<uint8_t>& generatedAcfParm)
+{
+    std::string sJsonString;
+    std::vector<uint8_t> sJsonDigest;
+    CeLoginRc sRc =
+        createCeLoginAcfV1Payload(argsParm, sJsonString, sJsonDigest);
+
+    std::vector<uint8_t> sJsonSignature;
+
+    if (CeLoginRc::Success == sRc)
+    {
+        sRc =
+            createCeLoginAcfV1Signature(argsParm, sJsonDigest, sJsonSignature);
+    }
+
+    if (CeLoginRc::Success == sRc)
+    {
+        sRc = createCeLoginAcfV1Asn1(argsParm, sJsonString, sJsonSignature,
+                                     generatedAcfParm);
     }
 
     return sRc;

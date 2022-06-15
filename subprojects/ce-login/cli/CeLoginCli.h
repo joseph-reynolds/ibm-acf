@@ -6,9 +6,10 @@
 
 namespace cli
 {
-    CeLogin::CeLoginRc createHsf(int argc, char** argv);
-    CeLogin::CeLoginRc decodeHsf(int argc, char** argv);
-    CeLogin::CeLoginRc verifyHsf(int argc, char** argv);
+CeLogin::CeLoginRc createHsf(int argc, char** argv);
+CeLogin::CeLoginRc decodeHsf(int argc, char** argv);
+CeLogin::CeLoginRc verifyHsf(int argc, char** argv);
+
 }; // namespace cli
 
 #endif
