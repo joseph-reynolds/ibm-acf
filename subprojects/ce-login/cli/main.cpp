@@ -26,6 +26,11 @@ int main(int argc, char** argv)
             sPrintHelp = false;
             sRc = cli::createHsf(argc, argv);
         }
+        else if (0 == strcmp(argv[1], "create_prod"))
+        {
+            sPrintHelp = false;
+            sRc = cli::createProductionHsf(argc, argv);
+        }
         else if (0 == strcmp(argv[1], "decode"))
         {
             sPrintHelp = false;
@@ -46,12 +51,14 @@ int main(int argc, char** argv)
     if (sPrintHelp)
     {
         std::cout << "Usage:" << std::endl;
-        std::cout << "    " << argv[0] << " [create|decode|verify|test] <args>"
+        std::cout << "    " << argv[0]
+                  << " [create_prod|create|decode|verify|test] <args>"
                   << std::endl;
         std::cout << std::endl;
         std::cout << "Command Help Text:" << std::endl;
         std::cout << "    " << argv[0]
-                  << " [create|decode|verify|test] [-h|--help]" << std::endl;
+                  << " [create_prod|create|decode|verify|test] [-h|--help]"
+                  << std::endl;
     }
     return (int)sRc.mReason;
 }

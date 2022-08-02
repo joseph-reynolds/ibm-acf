@@ -73,6 +73,7 @@ ce_login_sources = ['celogin/src/CeLoginAsnV1.cpp',
 
 cli_sources = [ 'cli/CliCeLoginV1.cpp',
                 'cli/CliCreateHsf.cpp',
+                'cli/CliCreateProductionHsf.cpp',
                 'cli/CliDecodeHsf.cpp',
                 'cli/CliUtils.cpp',
                 'cli/CliVerifyHsf.cpp',

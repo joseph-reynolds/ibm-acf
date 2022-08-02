@@ -1,8 +1,14 @@
 #include "CliUtils.h"
 
+#include "CliCeLoginV1.h"
+
+#include <CeLogin.h>
+#include <getopt.h>
 #include <inttypes.h>
 #include <openssl/sha.h>
+#include <string.h>
 
+#include <algorithm>
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -118,17 +124,18 @@ bool cli::getStringFromJson(json_object* jsonObjectParm,
     return sSuccess;
 }
 
-bool cli::createSha512PasswordHash(const std::string& passwordParm,
+bool cli::createSha512PasswordHash(const uint8_t* passwordParm,
+                                   const uint64_t lengthParm,
                                    std::vector<uint8_t>& outputHashParm)
 {
-    if (passwordParm.empty())
+    if (!passwordParm || 0 == lengthParm)
     {
         return false;
     }
 
     std::vector<uint8_t> sSha512Digest(SHA512_DIGEST_LENGTH);
-    uint8_t* sHashResult = SHA512((const uint8_t*)passwordParm.c_str(),
-                                  passwordParm.length(), sSha512Digest.data());
+    uint8_t* sHashResult =
+        SHA512(passwordParm, lengthParm, sSha512Digest.data());
 
     if (sSha512Digest.data() == sHashResult)
     {
@@ -140,4 +147,85 @@ bool cli::createSha512PasswordHash(const std::string& passwordParm,
     }
 
     return true;
+}
+
+bool cli::parseMachineFromString(const std::string& stringParm,
+                                 CeLogin::Machine& machineParm)
+{
+    using namespace std;
+    bool sIsSuccess = false;
+
+    size_t sCount = count(stringParm.begin(), stringParm.end(), ',');
+    if (2 == sCount)
+    {
+        size_t sFirstDelimiter = stringParm.find(',');
+        size_t sSecondDelimiter = stringParm.find(',', sFirstDelimiter + 1);
+
+        string sProcStr = stringParm.substr(0, sFirstDelimiter);
+        string sAuthStr = stringParm.substr(
+            sFirstDelimiter + 1, sSecondDelimiter - sFirstDelimiter - 1);
+        string sSerialStr = stringParm.substr(
+            sSecondDelimiter + 1, stringParm.length() - sSecondDelimiter - 1);
+
+        // TODO: force sProcStr and sAuthStr to a consistant case for better
+        // parsing
+
+        if (0 == sProcStr.compare("P10"))
+        {
+            CeLogin::ServiceAuthority sAuth = CeLogin::ServiceAuth_None;
+            if (0 == sAuthStr.compare("dev"))
+            {
+                sAuth = CeLogin::ServiceAuth_Dev;
+            }
+            else if (0 == sAuthStr.compare("ce"))
+            {
+                sAuth = CeLogin::ServiceAuth_CE;
+            }
+
+            if (CeLogin::ServiceAuth_None != sAuth)
+            {
+                if (!sSerialStr.empty())
+                {
+                    machineParm.mAuth = sAuth;
+                    machineParm.mProc = CeLogin::P10;
+                    machineParm.mSerialNumber = sSerialStr;
+                    sIsSuccess = true;
+                }
+            }
+        }
+    }
+    return sIsSuccess;
+}
+
+void cli::printHelp(const char* cmdParm, const char* subCmdParm,
+                    const std::string& introParagraphParm,
+                    const option optionsParm[], std::string descriptionParm[],
+                    const uint64_t numOptionsParm)
+{
+    // Find the longest option
+    size_t sLongestOpt = 0;
+    for (size_t i = 0; i < numOptionsParm; i++)
+    {
+        size_t sLength = strlen(optionsParm[i].name);
+        sLongestOpt = std::max<size_t>(sLongestOpt, sLength);
+    }
+
+    std::cout << "Usage: " << cmdParm << " " << subCmdParm << std::endl;
+
+    if (!introParagraphParm.empty())
+    {
+        std::cout << std::endl << introParagraphParm << std::endl << std::endl;
+    }
+
+    for (unsigned int i = 0; i < numOptionsParm; i++)
+    {
+        size_t sLength = strlen(optionsParm[i].name);
+        std::cout << "\t-" << (char)(optionsParm[i].val) << " --"
+                  << optionsParm[i].name;
+        for (size_t j = 0; j < (sLongestOpt - sLength); j++)
+        {
+            std::cout << " ";
+        }
+        std::cout << " | " << descriptionParm[i] << std::endl;
+    }
 }

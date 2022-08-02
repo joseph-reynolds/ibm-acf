@@ -103,30 +103,6 @@ void decodeParseArgs(int argc, char** argv, struct DecodeArguments& args)
     }
 }
 
-void decodePrintHelp(int argc, char** argv)
-{
-    // Find the longest option
-    size_t sLongestOpt = 0;
-    for (unsigned int i = 0; i < NOptOptions; i++)
-    {
-        size_t sLength = strlen(decode_long_options[i].name);
-        sLongestOpt = max<size_t>(sLongestOpt, sLength);
-    }
-
-    cout << "Usage: " << argv[0] << " " << argv[1] << endl;
-    for (unsigned int i = 0; i < NOptOptions; i++)
-    {
-        size_t sLength = strlen(decode_long_options[i].name);
-        cout << "\t-" << (char)decode_long_options[i].val << " --"
-             << decode_long_options[i].name;
-        for (size_t j = 0; j < (sLongestOpt - sLength); j++)
-        {
-            cout << " ";
-        }
-        cout << " | " << decode_options_description[i] << endl;
-    }
-}
-
 bool decodeValidateArgs(const DecodeArguments& args)
 {
     bool sIsValidArgs = true;
@@ -157,7 +133,7 @@ void printDecodedHsf(const CeLogin::CeLoginDecryptedHsfArgsV1& hsfParm,
     }
     cout << "\t]" << endl;
     cout << "\thashedAuthCode:\t" << hsfParm.mPasswordHash << endl;
-    cout << "\tsalt:\t" << hsfParm.mSalt << endl;
+    cout << "\tsalt:\t\t" << hsfParm.mSalt << endl;
     cout << "\titerations:\t" << hsfParm.mIterations << endl;
     cout << "\texpiration:\t" << hsfParm.mExpirationDate << endl;
     cout << "\trequestId:\t" << hsfParm.mRequestId << endl;
@@ -183,7 +159,8 @@ CeLogin::CeLoginRc cli::decodeHsf(int argc, char** argv)
 
     if (sArgs.mHelp)
     {
-        decodePrintHelp(argc, argv);
+        cli::printHelp(argv[0], argv[1], "", decode_long_options,
+                       decode_options_description, NOptOptions);
     }
     else if (decodeValidateArgs(sArgs))
     {

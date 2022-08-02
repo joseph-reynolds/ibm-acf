@@ -29,10 +29,6 @@ struct CreateArguments
     string mOutputFile;
     string mPasswordHashAlgorithm;
     size_t mIterations;
-    string mJsonPath;
-    string mSignaturePath;
-    string mJsonHashPath;
-    string mMode;
     bool mVerbose;
     bool mHelp;
     CreateArguments() :
@@ -51,10 +47,6 @@ enum CreateOptOptions
     OutputFile,
     PasswordHashAlgorithm,
     Iterations,
-    JsonPath,
-    JsonSignaturePath,
-    JsonDigestPath,
-    Mode,
     Help,
     Verbose,
     NOptOptions
@@ -68,10 +60,6 @@ struct option create_long_options[NOptOptions + 1] = {
     {"output", required_argument, NULL, 'o'},
     {"algorithm", required_argument, NULL, 'a'},
     {"iterations", required_argument, NULL, 'n'},
-    {"json", required_argument, NULL, 'J'},
-    {"jsonSignature", required_argument, NULL, 'S'},
-    {"jsonDigest", required_argument, NULL, 'D'},
-    {"mode", required_argument, NULL, 'M'},
     {"help", no_argument, NULL, 'h'},
     {"verbose", no_argument, NULL, 'v'},
     {0, 0, 0, 0}};
@@ -84,87 +72,12 @@ string create_options_description[NOptOptions] = {
     "OutputFile",
     "<sha512|prod> - Password Hash Algorithm : default prod",
     "Number of iterations in PBKDF2 routine",
-    "partialpayload",
-    "signature",
-    "JsonDigestPath",
-    "Mode",
     "Help",
     "Verbose"};
 
-enum CreateModes
-{
-    Mode_Full,
-    Mode_Json,
-    Mode_Sign,
-    Mode_Asn1,
-    NCreateModes
-};
-
-string CreateModesStrings[NCreateModes] = {"full", "json", "sign", "asn1"};
-
-bool checkRequiredArgsPresent(const CreateArguments& argsParm,
-                              const CreateModes modeParm)
+bool checkRequiredArgsPresent(const CreateArguments& argsParm)
 {
     return true;
-}
-
-CreateModes parseModeFromString(const string& stringParm)
-{
-    for (size_t sIdx = 0; sIdx < NCreateModes; sIdx++)
-    {
-        if (0 == stringParm.compare(CreateModesStrings[sIdx]))
-        {
-            return (CreateModes)sIdx;
-        }
-    }
-    return Mode_Full;
-}
-
-bool parseMachineFromString(const string& stringParm,
-                            CeLogin::Machine& machineParm)
-{
-    bool sIsSuccess = false;
-
-    size_t sCount = count(stringParm.begin(), stringParm.end(), ',');
-    if (2 == sCount)
-    {
-        size_t sFirstDelimiter = stringParm.find(',');
-        size_t sSecondDelimiter = stringParm.find(',', sFirstDelimiter + 1);
-
-        string sProcStr = stringParm.substr(0, sFirstDelimiter);
-        string sAuthStr = stringParm.substr(
-            sFirstDelimiter + 1, sSecondDelimiter - sFirstDelimiter - 1);
-        string sSerialStr = stringParm.substr(
-            sSecondDelimiter + 1, stringParm.length() - sSecondDelimiter - 1);
-
-        // TODO: force sProcStr and sAuthStr to a consistant case for better
-        // parsing
-
-        if (0 == sProcStr.compare("P10"))
-        {
-            CeLogin::ServiceAuthority sAuth = CeLogin::ServiceAuth_None;
-            if (0 == sAuthStr.compare("dev"))
-            {
-                sAuth = CeLogin::ServiceAuth_Dev;
-            }
-            else if (0 == sAuthStr.compare("ce"))
-            {
-                sAuth = CeLogin::ServiceAuth_CE;
-            }
-
-            if (CeLogin::ServiceAuth_None != sAuth)
-            {
-                if (!sSerialStr.empty())
-                {
-                    machineParm.mAuth = sAuth;
-                    machineParm.mProc = CeLogin::P10;
-                    machineParm.mSerialNumber = sSerialStr;
-                    sIsSuccess = true;
-                }
-            }
-        }
-    }
-    return sIsSuccess;
 }
 
 void createParseArgs(int argc, char** argv, struct CreateArguments& args)
@@ -197,7 +110,7 @@ void createParseArgs(int argc, char** argv, struct CreateArguments& args)
             string sArg = optarg;
             // Count the number of delimiters, should be 2
             CeLogin::Machine sMachine;
-            if (parseMachineFromString(sArg, sMachine))
+            if (cli::parseMachineFromString(sArg, sMachine))
             {
                 args.mMachines.push_back(sMachine);
             }
@@ -235,22 +148,6 @@ void createParseArgs(int argc, char** argv, struct CreateArguments& args)
         else if (c == create_long_options[Iterations].val)
         {
             args.mIterations = std::stoi(optarg);
-        }
-        else if (c == create_long_options[JsonPath].val)
-        {
-            args.mJsonPath = optarg;
-        }
-        else if (c == create_long_options[JsonSignaturePath].val)
-        {
-            args.mSignaturePath = optarg;
-        }
-        else if (c == create_long_options[JsonDigestPath].val)
-        {
-            args.mJsonHashPath = optarg;
-        }
-        else if (c == create_long_options[Mode].val)
-        {
-            args.mMode = optarg;
         }
         else if (c == create_long_options[Help].val)
         {
@@ -299,30 +196,6 @@ bool createValidateArgs(const CreateArguments& args)
     return sIsValidArgs;
 }
 
-void createPrintHelp(int argc, char** argv)
-{
-    // Find the longest option
-    size_t sLongestOpt = 0;
-    for (unsigned int i = 0; i < NOptOptions; i++)
-    {
-        size_t sLength = strlen(create_long_options[i].name);
-        sLongestOpt = max<size_t>(sLongestOpt, sLength);
-    }
-
-    cout << "Usage: " << argv[0] << " " << argv[1] << endl;
-    for (unsigned int i = 0; i < NOptOptions; i++)
-    {
-        size_t sLength = strlen(create_long_options[i].name);
-        cout << "\t-" << (char)create_long_options[i].val << " --"
-             << create_long_options[i].name;
-        for (size_t j = 0; j < (sLongestOpt - sLength); j++)
-        {
-            cout << " ";
-        }
-        cout << " | " << create_options_description[i] << endl;
-    }
-}
-
 CeLogin::CeLoginRc cli::createHsf(int argc, char** argv)
 {
     CreateArguments sArgs;
@@ -332,7 +205,8 @@ CeLogin::CeLoginRc cli::createHsf(int argc, char** argv)
 
     if (sArgs.mHelp)
     {
-        createPrintHelp(argc, argv);
+        cli::printHelp(argv[0], argv[1], "", create_long_options,
+                       create_options_description, NOptOptions);
     }
     else if (createValidateArgs(sArgs))
     {
@@ -342,7 +216,8 @@ CeLogin::CeLoginRc cli::createHsf(int argc, char** argv)
 
         sCreateHsfArgs.mMachines = sArgs.mMachines;
 
-        sCreateHsfArgs.mPassword = sArgs.mPassword;
+        sCreateHsfArgs.mPasswordPtr = sArgs.mPassword.data();
+        sCreateHsfArgs.mPasswordLength = sArgs.mPassword.length();
 
         sCreateHsfArgs.mExpirationDate = sArgs.mExpirationDate;
 
@@ -393,110 +268,13 @@ CeLogin::CeLoginRc cli::createHsf(int argc, char** argv)
             return sRc;
         }
 
-        CreateModes sMode = parseModeFromString(sArgs.mMode);
+        vector<uint8_t> sAcfBinary;
+        sRc = CeLogin::createCeLoginAcfV1(sCreateHsfArgs, sAcfBinary);
 
-        cout << "Running in mode: " << CreateModesStrings[sMode] << endl;
-
-        if (sMode == Mode_Json)
+        if (!writeBinaryFile(sArgs.mOutputFile, sAcfBinary.data(),
+                             sAcfBinary.size()))
         {
-            string sJson;
-            vector<uint8_t> sHash;
-            sRc = CeLogin::createCeLoginAcfV1Payload(sCreateHsfArgs, sJson,
-                                                     sHash);
-
-            if (CeLogin::CeLoginRc::Success == sRc)
-            {
-                if (writeBinaryFile(sArgs.mJsonPath,
-                                    (const uint8_t*)sJson.data(),
-                                    sJson.length()))
-                {
-                    cout << "Wrote: " << sArgs.mJsonPath << endl;
-                }
-                else
-                {
-                    cout << "Error in file" << endl;
-                }
-
-                if (writeBinaryFile(sArgs.mJsonHashPath,
-                                    (const uint8_t*)sHash.data(), sHash.size()))
-                {
-                    cout << "Wrote: " << sArgs.mJsonHashPath << endl;
-                }
-                else
-                {
-                    cout << "Error in file" << endl;
-                }
-            }
-        }
-        if (sMode == Mode_Sign)
-        {
-            std::vector<uint8_t> sJsonDigest;
-            std::vector<uint8_t> sSignature;
-            bool sIsDigestValid =
-                readBinaryFile(sArgs.mJsonHashPath, sJsonDigest);
-
-            if (sIsDigestValid)
-            {
-                sRc = CeLogin::createCeLoginAcfV1Signature(
-                    sCreateHsfArgs, sJsonDigest, sSignature);
-            }
-            else
-            {
-                cout << "Unable to read digest file" << endl;
-            }
-
-            if (writeBinaryFile(sArgs.mSignaturePath,
-                                (const uint8_t*)sSignature.data(),
-                                sSignature.size()))
-            {
-                cout << "Wrote: " << sArgs.mSignaturePath << endl;
-            }
-            else
-            {
-                cout << "Error in file" << endl;
-            }
-        }
-        if (sMode == Mode_Asn1)
-        {
-            std::vector<uint8_t> sJson;
-            std::vector<uint8_t> sSignature;
-            std::vector<uint8_t> sAcf;
-            bool sIsJsonValid = readBinaryFile(sArgs.mJsonPath, sJson);
-            bool sIsSignatureValid =
-                readBinaryFile(sArgs.mSignaturePath, sSignature);
-
-            if (sIsJsonValid && sIsSignatureValid)
-            {
-                string sJsonStr = string((char*)sJson.data(),
-                                         (char*)sJson.data() + sJson.size());
-                sRc = CeLogin::createCeLoginAcfV1Asn1(sCreateHsfArgs, sJsonStr,
-                                                      sSignature, sAcf);
-            }
-            else
-            {
-                cout << "Unable to read digest file" << endl;
-            }
-
-            if (writeBinaryFile(sArgs.mOutputFile, (const uint8_t*)sAcf.data(),
-                                sAcf.size()))
-            {
-                cout << "Wrote: " << sArgs.mOutputFile << endl;
-            }
-            else
-            {
-                cout << "Error in file" << endl;
-            }
-        }
-        else if (sMode == Mode_Full)
-        {
-            vector<uint8_t> sAcfBinary;
-            sRc = CeLogin::createCeLoginAcfV1(sCreateHsfArgs, sAcfBinary);
-
-            if (!writeBinaryFile(sArgs.mOutputFile, sAcfBinary.data(),
-                                 sAcfBinary.size()))
-            {
-                cout << "Error in file" << endl;
-            }
+            cout << "Error in file" << endl;
         }
 
         cout << "RC: " << hex << (int)sRc << endl;
