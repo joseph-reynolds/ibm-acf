@@ -244,6 +244,7 @@ CeLogin::CeLoginRc cli::createHsf(int argc, char** argv)
         }
         else
         {
+            cout << "Error reading private key file" << endl;
             return sRc;
         }
 
@@ -274,12 +275,11 @@ CeLogin::CeLoginRc cli::createHsf(int argc, char** argv)
         if (!writeBinaryFile(sArgs.mOutputFile, sAcfBinary.data(),
                              sAcfBinary.size()))
         {
-            cout << "Error in file" << endl;
+            cout << "Error writing final ACF file" << endl;
         }
 
         cout << "RC: " << hex << (int)sRc << endl;
-
-        // cout << sAcfBinary.size() << endl;
     }
+
     return sRc;
 }

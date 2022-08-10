@@ -36,7 +36,7 @@ struct Arguments
     string mOutputFile;
     string mJsonPath;
     string mSignaturePath;
-    string mJsonHashPath;
+    string mJsonDigestPath;
     bool mVerbose;
     bool mHelp;
     Arguments() : mVerbose(false), mHelp(false)
@@ -155,7 +155,6 @@ void parseArgs(int argc, char** argv, struct Arguments& args)
         else if (c == long_options[Comment].val)
         {
             args.mComment = optarg;
-            cout << optarg << endl;
         }
         else if (c == long_options[OutputFile].val)
         {
@@ -171,7 +170,7 @@ void parseArgs(int argc, char** argv, struct Arguments& args)
         }
         else if (c == long_options[JsonDigestPath].val)
         {
-            args.mJsonHashPath = optarg;
+            args.mJsonDigestPath = optarg;
         }
         else if (c == long_options[Help].val)
         {
@@ -195,7 +194,7 @@ bool validateArgs(const Arguments& args, Operation& operationParm)
     bool mIsComment = !args.mComment.empty();
     bool mIsPassword = !args.mPasswordFile.empty();
     bool mIsJson = !args.mJsonPath.empty();
-    bool mIsDigest = !args.mJsonHashPath.empty();
+    bool mIsDigest = !args.mJsonDigestPath.empty();
     bool mIsSignature = !args.mSignaturePath.empty();
     bool mIsAcf = !args.mOutputFile.empty();
 
@@ -298,21 +297,21 @@ CeLogin::CeLoginRc cli::createProductionHsf(int argc, char** argv)
             }
             else
             {
-                cout << "Error in file" << endl;
+                cout << "Error writing json file" << endl;
                 sRc = CeLogin::CeLoginRc::Failure;
             }
 
             // Digest Output is not required
-            if (!sArgs.mJsonHashPath.empty())
+            if (!sArgs.mJsonDigestPath.empty())
             {
-                if (writeBinaryFile(sArgs.mJsonHashPath,
+                if (writeBinaryFile(sArgs.mJsonDigestPath,
                                     (const uint8_t*)sHash.data(), sHash.size()))
                 {
-                    cout << "Wrote: " << sArgs.mJsonHashPath << endl;
+                    cout << "Wrote: " << sArgs.mJsonDigestPath << endl;
                 }
                 else
                 {
-                    cout << "Error in file" << endl;
+                    cout << "Error writing digest file " << endl;
                     sRc = CeLogin::CeLoginRc::Failure;
                 }
             }
@@ -325,7 +324,7 @@ CeLogin::CeLoginRc cli::createProductionHsf(int argc, char** argv)
             }
             else
             {
-                cout << "Error in file" << endl;
+                cout << "Error writing generated password file" << endl;
                 sRc = CeLogin::CeLoginRc::Failure;
             }
         }
@@ -342,30 +341,27 @@ CeLogin::CeLoginRc cli::createProductionHsf(int argc, char** argv)
         std::vector<uint8_t> sJson;
         std::vector<uint8_t> sSignature;
         std::vector<uint8_t> sAcf;
-        bool sIsJsonValid = readBinaryFile(sArgs.mJsonPath, sJson);
-        bool sIsSignatureValid =
-            readBinaryFile(sArgs.mSignaturePath, sSignature);
 
-        if (sArgs.mComment.empty())
+        sCreateHsfArgs.mSourceFileName =
+            sArgs.mComment.empty() ? "" : sArgs.mComment;
+
+        if (!readBinaryFile(sArgs.mJsonPath, sJson))
         {
-            sCreateHsfArgs.mSourceFileName = "";
+            cout << "Error reading json file" << endl;
+            sRc = CeLogin::CeLoginRc::Failure;
+        }
+        else if (!readBinaryFile(sArgs.mSignaturePath, sSignature))
+        {
+            cout << "Error reading signature" << endl;
+            sRc = CeLogin::CeLoginRc::Failure;
         }
         else
         {
-            sCreateHsfArgs.mSourceFileName = sArgs.mComment;
-        }
-
-        if (sIsJsonValid && sIsSignatureValid)
-        {
+            // Both Json and Signature files have been read
             string sJsonStr =
                 string((char*)sJson.data(), (char*)sJson.data() + sJson.size());
             sRc = CeLogin::createCeLoginAcfV1Asn1(sCreateHsfArgs, sJsonStr,
                                                   sSignature, sAcf);
-        }
-        else
-        {
-            cout << "Unable to read digest file" << endl;
-            sRc = CeLogin::CeLoginRc::Failure;
         }
 
         if (CeLogin::CeLoginRc::Success == sRc)
@@ -377,7 +373,7 @@ CeLogin::CeLoginRc cli::createProductionHsf(int argc, char** argv)
             }
             else
             {
-                cout << "Error in file" << endl;
+                cout << "Error writing final ACF file" << endl;
                 sRc = CeLogin::CeLoginRc::Failure;
             }
         }

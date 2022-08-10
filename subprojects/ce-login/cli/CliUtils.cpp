@@ -39,7 +39,8 @@ bool cli::readBinaryFile(const std::string fileNameParm,
         }
         else
         {
-            std::cout << "Failed to open file : " << fileNameParm << std::endl;
+            std::cout << "Failed to open file for reading : " << fileNameParm
+                      << std::endl;
         }
     }
     else
@@ -65,6 +66,15 @@ bool cli::writeBinaryFile(const std::string fileNameParm,
             sOutputFile.close();
             return true;
         }
+        else
+        {
+            std::cout << "Failed to open file for writing : " << fileNameParm
+                      << std::endl;
+        }
+    }
+    else
+    {
+        std::cout << "write-error: filename empty" << std::endl;
     }
     return false;
 }
