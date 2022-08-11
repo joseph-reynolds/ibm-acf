@@ -4,6 +4,7 @@
 #include "CliCeLoginV1.h"
 
 #include <CeLogin.h>
+#include <string.h>
 
 #include <array>
 #include <iostream>
@@ -623,7 +624,8 @@ CeLogin::CeLoginCreateHsfArgsV1 GetDefaultHsfArgs()
     sCreateHsfArgs.mHashedAuthCodeLength = 512 / 8;
     sCreateHsfArgs.mSaltLength = 512 / 8;
     sCreateHsfArgs.mIterations = CeLogin::CeLogin_PBKDF2_Iterations;
-    sCreateHsfArgs.mPassword = "password";
+    sCreateHsfArgs.mPasswordPtr = "password";
+    sCreateHsfArgs.mPasswordLength = strlen("password");
     sCreateHsfArgs.mPasswordHashAlgorithm = CeLogin::PasswordHash_Production;
     std::copy(key1_priv_der, key1_priv_der + key1_priv_der_len,
               std::back_inserter(sCreateHsfArgs.mPrivateKey));
@@ -644,7 +646,7 @@ UnitTestResult ut_validate_defaults()
     ServiceAuthority sAuth;
     uint64_t sExp;
     sRc = cplusplus_getServiceAuthorityV1(
-        sAcf, sHsfArgs.mPassword, 0, key1_pub_der, key1_pub_der_len,
+        sAcf, sHsfArgs.mPasswordPtr, 0, key1_pub_der, key1_pub_der_len,
         sHsfArgs.mMachines.front().mSerialNumber, sAuth, sExp);
     DO_TEST(sResult, CeLoginRc::Success == sRc, sRc);
     DO_TEST(sResult, sExp > 0, sExp);
@@ -671,8 +673,8 @@ UnitTestResult ut_validate_unset_serial()
     ServiceAuthority sAuth;
     uint64_t sExp;
     sRc = cplusplus_getServiceAuthorityV1(
-        sAcf, sHsfArgs.mPassword, sCurrentTime, key1_pub_der, key1_pub_der_len,
-        sUnsetSerial, sAuth, sExp);
+        sAcf, sHsfArgs.mPasswordPtr, sCurrentTime, key1_pub_der,
+        key1_pub_der_len, sUnsetSerial, sAuth, sExp);
     DO_TEST(sResult, CeLoginRc::Success == sRc, sRc);
     DO_TEST(sResult, sExp > 0, sExp);
     DO_TEST(sResult, sAuth == ServiceAuth_CE, sAuth);
@@ -699,9 +701,9 @@ UnitTestResult ut_invalid_parms()
         uint64_t sExpirationTime = 0;
 
         sRc = getServiceAuthorityV1(
-            NULL, sAcf.size(), sHsfArgs.mPassword.data(),
-            sHsfArgs.mPassword.length(), sCurrentTime, key1_pub_der,
-            key1_pub_der_len, sHsfArgs.mMachines.front().mSerialNumber.data(),
+            NULL, sAcf.size(), sHsfArgs.mPasswordPtr, sHsfArgs.mPasswordLength,
+            sCurrentTime, key1_pub_der, key1_pub_der_len,
+            sHsfArgs.mMachines.front().mSerialNumber.data(),
             sHsfArgs.mMachines.front().mSerialNumber.length(), sAuth,
             sExpirationTime);
         DO_TEST(sResult, CeLoginRc::GetSevAuth_InvalidAcfPtr == sRc, sRc);
@@ -715,9 +717,9 @@ UnitTestResult ut_invalid_parms()
         uint64_t sExpirationTime = 0;
 
         sRc = getServiceAuthorityV1(
-            sAcf.data(), 0, sHsfArgs.mPassword.data(),
-            sHsfArgs.mPassword.length(), sCurrentTime, key1_pub_der,
-            key1_pub_der_len, sHsfArgs.mMachines.front().mSerialNumber.data(),
+            sAcf.data(), 0, sHsfArgs.mPasswordPtr, sHsfArgs.mPasswordLength,
+            sCurrentTime, key1_pub_der, key1_pub_der_len,
+            sHsfArgs.mMachines.front().mSerialNumber.data(),
             sHsfArgs.mMachines.front().mSerialNumber.length(), sAuth,
             sExpirationTime);
         DO_TEST(sResult, CeLoginRc::GetSevAuth_InvalidAcfLength == sRc, sRc);
@@ -731,7 +733,7 @@ UnitTestResult ut_invalid_parms()
         uint64_t sExpirationTime = 0;
 
         sRc = getServiceAuthorityV1(
-            sAcf.data(), sAcf.size(), NULL, sHsfArgs.mPassword.length(),
+            sAcf.data(), sAcf.size(), NULL, sHsfArgs.mPasswordLength,
             sCurrentTime, key1_pub_der, key1_pub_der_len,
             sHsfArgs.mMachines.front().mSerialNumber.data(),
             sHsfArgs.mMachines.front().mSerialNumber.length(), sAuth,
@@ -747,8 +749,8 @@ UnitTestResult ut_invalid_parms()
         uint64_t sExpirationTime = 0;
 
         sRc = getServiceAuthorityV1(
-            sAcf.data(), sAcf.size(), sHsfArgs.mPassword.data(), 0,
-            sCurrentTime, key1_pub_der, key1_pub_der_len,
+            sAcf.data(), sAcf.size(), sHsfArgs.mPasswordPtr, 0, sCurrentTime,
+            key1_pub_der, key1_pub_der_len,
             sHsfArgs.mMachines.front().mSerialNumber.data(),
             sHsfArgs.mMachines.front().mSerialNumber.length(), sAuth,
             sExpirationTime);
@@ -764,8 +766,8 @@ UnitTestResult ut_invalid_parms()
         uint64_t sExpirationTime = 0;
 
         sRc = getServiceAuthorityV1(
-            sAcf.data(), sAcf.size(), sHsfArgs.mPassword.data(),
-            sHsfArgs.mPassword.length(), sCurrentTime, key1_pub_der,
+            sAcf.data(), sAcf.size(), sHsfArgs.mPasswordPtr,
+            sHsfArgs.mPasswordLength, sCurrentTime, key1_pub_der,
             key1_pub_der_len, NULL,
             sHsfArgs.mMachines.front().mSerialNumber.length(), sAuth,
             sExpirationTime);
@@ -781,8 +783,8 @@ UnitTestResult ut_invalid_parms()
         uint64_t sExpirationTime = 0;
 
         sRc = getServiceAuthorityV1(
-            sAcf.data(), sAcf.size(), sHsfArgs.mPassword.data(),
-            sHsfArgs.mPassword.length(), sCurrentTime, key1_pub_der,
+            sAcf.data(), sAcf.size(), sHsfArgs.mPasswordPtr,
+            sHsfArgs.mPasswordLength, sCurrentTime, key1_pub_der,
             key1_pub_der_len, sHsfArgs.mMachines.front().mSerialNumber.data(),
             0, sAuth, sExpirationTime);
         DO_TEST(sResult, CeLoginRc::GetSevAuth_InvalidSerialNumberLength == sRc,
@@ -797,8 +799,8 @@ UnitTestResult ut_invalid_parms()
         uint64_t sExpirationTime = 0;
 
         sRc = getServiceAuthorityV1(
-            sAcf.data(), sAcf.size(), sHsfArgs.mPassword.data(),
-            sHsfArgs.mPassword.length(), sCurrentTime, NULL, key1_pub_der_len,
+            sAcf.data(), sAcf.size(), sHsfArgs.mPasswordPtr,
+            sHsfArgs.mPasswordLength, sCurrentTime, NULL, key1_pub_der_len,
             sHsfArgs.mMachines.front().mSerialNumber.data(),
             sHsfArgs.mMachines.front().mSerialNumber.size(), sAuth,
             sExpirationTime);
@@ -813,8 +815,8 @@ UnitTestResult ut_invalid_parms()
         uint64_t sExpirationTime = 0;
 
         sRc = getServiceAuthorityV1(
-            sAcf.data(), sAcf.size(), sHsfArgs.mPassword.data(),
-            sHsfArgs.mPassword.length(), sCurrentTime, key1_pub_der, 0,
+            sAcf.data(), sAcf.size(), sHsfArgs.mPasswordPtr,
+            sHsfArgs.mPasswordLength, sCurrentTime, key1_pub_der, 0,
             sHsfArgs.mMachines.front().mSerialNumber.data(),
             sHsfArgs.mMachines.front().mSerialNumber.size(), sAuth,
             sExpirationTime);
@@ -997,7 +999,7 @@ UnitTestResult ut_expiration_time_validation()
         ServiceAuthority sAuth = ServiceAuth_None;
 
         sRc = cplusplus_getServiceAuthorityV1(
-            sAcf, sHsfArgs.mPassword, sCurrentTime, key1_pub_der,
+            sAcf, sHsfArgs.mPasswordPtr, sCurrentTime, key1_pub_der,
             key1_pub_der_len, sHsfArgs.mMachines.front().mSerialNumber, sAuth,
             sExpiration);
         DO_TEST(sResult, CeLoginRc::Success == sRc, sRc);
@@ -1013,7 +1015,7 @@ UnitTestResult ut_expiration_time_validation()
         ServiceAuthority sAuth = ServiceAuth_None;
 
         sRc = cplusplus_getServiceAuthorityV1(
-            sAcf, sHsfArgs.mPassword, sCurrentTime, key1_pub_der,
+            sAcf, sHsfArgs.mPasswordPtr, sCurrentTime, key1_pub_der,
             key1_pub_der_len, sHsfArgs.mMachines.front().mSerialNumber, sAuth,
             sExpiration);
         DO_TEST(sResult, CeLoginRc::Success == sRc, sRc);
@@ -1028,7 +1030,7 @@ UnitTestResult ut_expiration_time_validation()
         ServiceAuthority sAuth = ServiceAuth_None;
 
         sRc = cplusplus_getServiceAuthorityV1(
-            sAcf, sHsfArgs.mPassword, sCurrentTime, key1_pub_der,
+            sAcf, sHsfArgs.mPasswordPtr, sCurrentTime, key1_pub_der,
             key1_pub_der_len, sHsfArgs.mMachines.front().mSerialNumber, sAuth,
             sExpiration);
         DO_TEST(sResult, CeLoginRc::Success == sRc, sRc);
@@ -1043,7 +1045,7 @@ UnitTestResult ut_expiration_time_validation()
         ServiceAuthority sAuth = ServiceAuth_None;
 
         sRc = cplusplus_getServiceAuthorityV1(
-            sAcf, sHsfArgs.mPassword, sCurrentTime, key1_pub_der,
+            sAcf, sHsfArgs.mPasswordPtr, sCurrentTime, key1_pub_der,
             key1_pub_der_len, sHsfArgs.mMachines.front().mSerialNumber, sAuth,
             sExpiration);
         DO_TEST(sResult, CeLoginRc::AcfExpired == sRc, sRc);
@@ -1136,7 +1138,7 @@ UnitTestResult ut_max_expiration_time_validation()
         ServiceAuthority sAuth = ServiceAuth_None;
 
         sRc = cplusplus_getServiceAuthorityV1(
-            sAcf, sHsfArgs.mPassword, sCurrentTime, key1_pub_der,
+            sAcf, sHsfArgs.mPasswordPtr, sCurrentTime, key1_pub_der,
             key1_pub_der_len, sHsfArgs.mMachines.front().mSerialNumber, sAuth,
             sExpiration);
         DO_TEST(sResult, CeLoginRc::Success == sRc, sRc);
@@ -1153,7 +1155,7 @@ UnitTestResult ut_max_expiration_time_validation()
         ServiceAuthority sAuth = ServiceAuth_None;
 
         sRc = cplusplus_getServiceAuthorityV1(
-            sAcf, sHsfArgs.mPassword, sCurrentTime, key1_pub_der,
+            sAcf, sHsfArgs.mPasswordPtr, sCurrentTime, key1_pub_der,
             key1_pub_der_len, sHsfArgs.mMachines.front().mSerialNumber, sAuth,
             sExpiration);
         DO_TEST(sResult, CeLoginRc::Success == sRc, sRc);
@@ -1170,7 +1172,7 @@ UnitTestResult ut_max_expiration_time_validation()
         ServiceAuthority sAuth = ServiceAuth_None;
 
         sRc = cplusplus_getServiceAuthorityV1(
-            sAcf, sHsfArgs.mPassword, sCurrentTime, key1_pub_der,
+            sAcf, sHsfArgs.mPasswordPtr, sCurrentTime, key1_pub_der,
             key1_pub_der_len, sHsfArgs.mMachines.front().mSerialNumber, sAuth,
             sExpiration);
         DO_TEST(sResult, CeLoginRc::Success == sRc, sRc);
@@ -1187,7 +1189,7 @@ UnitTestResult ut_max_expiration_time_validation()
         ServiceAuthority sAuth = ServiceAuth_None;
 
         sRc = cplusplus_getServiceAuthorityV1(
-            sAcf, sHsfArgs.mPassword, sCurrentTime, key1_pub_der,
+            sAcf, sHsfArgs.mPasswordPtr, sCurrentTime, key1_pub_der,
             key1_pub_der_len, sHsfArgs.mMachines.front().mSerialNumber, sAuth,
             sExpiration);
         DO_TEST(sResult, CeLoginRc::AcfExpired == sRc, sRc);
@@ -1214,8 +1216,9 @@ UnitTestResult ut_pki_mismatch()
     ServiceAuthority sAuth = ServiceAuth_None;
 
     sRc = cplusplus_getServiceAuthorityV1(
-        sAcf, sHsfArgs.mPassword, sCurrentTime, key2_pub_der, key2_pub_der_len,
-        sHsfArgs.mMachines.front().mSerialNumber, sAuth, sExpiration);
+        sAcf, sHsfArgs.mPasswordPtr, sCurrentTime, key2_pub_der,
+        key2_pub_der_len, sHsfArgs.mMachines.front().mSerialNumber, sAuth,
+        sExpiration);
     DO_TEST(sResult, CeLoginRc::SignatureNotValid == sRc, sRc);
     DO_TEST(sResult, 0 == sExpiration, sExpiration);
     DO_TEST(sResult, sAuth == ServiceAuth_None, sAuth);
@@ -1274,9 +1277,9 @@ UnitTestResult ut_corrupted_payload()
             ServiceAuthority sAuth = ServiceAuth_None;
 
             sRc = cplusplus_getServiceAuthorityV1(
-                sCorruptedAcf, sHsfArgs.mPassword, sCurrentTime, key1_pub_der,
-                key1_pub_der_len, sHsfArgs.mMachines.front().mSerialNumber,
-                sAuth, sExpiration);
+                sCorruptedAcf, sHsfArgs.mPasswordPtr, sCurrentTime,
+                key1_pub_der, key1_pub_der_len,
+                sHsfArgs.mMachines.front().mSerialNumber, sAuth, sExpiration);
             DO_TEST(sResult, CeLoginRc::Success != sRc, sIdx);
             DO_TEST(sResult, 0 == sExpiration, sIdx);
             DO_TEST(sResult, sAuth == ServiceAuth_None, sIdx);
@@ -1295,7 +1298,8 @@ UnitTestResult ut_incorrect_password()
     const uint64_t sCurrentTime = 0;
 
     CeLoginCreateHsfArgsV1 sHsfArgs = GetDefaultHsfArgs();
-    sHsfArgs.mPassword = sCorrectPassword;
+    sHsfArgs.mPasswordPtr = sCorrectPassword.data();
+    sHsfArgs.mPasswordLength = sCorrectPassword.length();
 
     std::vector<uint8_t> sAcf;
     sRc = createCeLoginAcfV1(sHsfArgs, sAcf);
@@ -1398,7 +1402,7 @@ UnitTestResult ut_incorrect_serial()
             ServiceAuthority sAuth = ServiceAuth_None;
 
             sRc = cplusplus_getServiceAuthorityV1(
-                sAcf, sHsfArgs.mPassword, sCurrentTime, key1_pub_der,
+                sAcf, sHsfArgs.mPasswordPtr, sCurrentTime, key1_pub_der,
                 key1_pub_der_len, sSerial1, sAuth, sExpiration);
             DO_TEST(sResult, CeLoginRc::Success == sRc, sRc);
             DO_TEST(sResult, sExpiration > 0, sExpiration);
@@ -1410,7 +1414,7 @@ UnitTestResult ut_incorrect_serial()
             ServiceAuthority sAuth = ServiceAuth_None;
 
             sRc = cplusplus_getServiceAuthorityV1(
-                sAcf, sHsfArgs.mPassword, sCurrentTime, key1_pub_der,
+                sAcf, sHsfArgs.mPasswordPtr, sCurrentTime, key1_pub_der,
                 key1_pub_der_len, sSerial2, sAuth, sExpiration);
             DO_TEST(sResult, CeLoginRc::Success == sRc, sRc);
             DO_TEST(sResult, sExpiration > 0, sExpiration);
@@ -1421,7 +1425,7 @@ UnitTestResult ut_incorrect_serial()
             ServiceAuthority sAuth = ServiceAuth_None;
 
             sRc = cplusplus_getServiceAuthorityV1(
-                sAcf, sHsfArgs.mPassword, sCurrentTime, key1_pub_der,
+                sAcf, sHsfArgs.mPasswordPtr, sCurrentTime, key1_pub_der,
                 key1_pub_der_len, sSerial3, sAuth, sExpiration);
             DO_TEST(sResult, CeLoginRc::Success == sRc, sRc);
             DO_TEST(sResult, sExpiration > 0, sExpiration);
@@ -1432,7 +1436,7 @@ UnitTestResult ut_incorrect_serial()
             ServiceAuthority sAuth = ServiceAuth_None;
 
             sRc = cplusplus_getServiceAuthorityV1(
-                sAcf, sHsfArgs.mPassword, sCurrentTime, key1_pub_der,
+                sAcf, sHsfArgs.mPasswordPtr, sCurrentTime, key1_pub_der,
                 key1_pub_der_len, sSerial4, sAuth, sExpiration);
             DO_TEST(sResult, CeLoginRc::SerialNumberMismatch == sRc, sRc);
             DO_TEST(sResult, sExpiration == 0, sExpiration);
@@ -1443,7 +1447,7 @@ UnitTestResult ut_incorrect_serial()
             ServiceAuthority sAuth = ServiceAuth_None;
 
             sRc = cplusplus_getServiceAuthorityV1(
-                sAcf, sHsfArgs.mPassword, sCurrentTime, key1_pub_der,
+                sAcf, sHsfArgs.mPasswordPtr, sCurrentTime, key1_pub_der,
                 key1_pub_der_len, sSerial5, sAuth, sExpiration);
             DO_TEST(sResult, CeLoginRc::SerialNumberMismatch == sRc, sRc);
             DO_TEST(sResult, sExpiration == 0, sExpiration);
@@ -1467,7 +1471,7 @@ UnitTestResult ut_incorrect_serial()
             ServiceAuthority sAuth = ServiceAuth_None;
 
             sRc = cplusplus_getServiceAuthorityV1(
-                sAcf, sHsfArgs.mPassword, sCurrentTime, key1_pub_der,
+                sAcf, sHsfArgs.mPasswordPtr, sCurrentTime, key1_pub_der,
                 key1_pub_der_len, sSerial1, sAuth, sExpiration);
             DO_TEST(sResult, CeLoginRc::Success == sRc, sRc);
             DO_TEST(sResult, sExpiration > 0, sExpiration);
@@ -1494,7 +1498,7 @@ UnitTestResult ut_incorrect_serial()
             ServiceAuthority sAuth = ServiceAuth_None;
 
             sRc = cplusplus_getServiceAuthorityV1(
-                sAcf, sHsfArgs.mPassword, sCurrentTime, key1_pub_der,
+                sAcf, sHsfArgs.mPasswordPtr, sCurrentTime, key1_pub_der,
                 key1_pub_der_len, sIncorrectSerial, sAuth, sExpiration);
             DO_TEST(sResult, CeLoginRc::SerialNumberMismatch == sRc, sRc);
             DO_TEST(sResult, sExpiration == 0, sExpiration);
@@ -1509,7 +1513,7 @@ UnitTestResult ut_incorrect_serial()
             ServiceAuthority sAuth = ServiceAuth_None;
 
             sRc = cplusplus_getServiceAuthorityV1(
-                sAcf, sHsfArgs.mPassword, sCurrentTime, key1_pub_der,
+                sAcf, sHsfArgs.mPasswordPtr, sCurrentTime, key1_pub_der,
                 key1_pub_der_len, sIncorrectSerial, sAuth, sExpiration);
             DO_TEST(sResult, CeLoginRc::SerialNumberMismatch == sRc, sRc);
             DO_TEST(sResult, sExpiration == 0, sExpiration);

@@ -125,30 +125,6 @@ void verifyParseArgs(int argc, char** argv, struct VerifyArguments& args)
     }
 }
 
-void verifyPrintHelp(int argc, char** argv)
-{
-    // Find the longest option
-    size_t sLongestOpt = 0;
-    for (unsigned int i = 0; i < NOptOptions; i++)
-    {
-        size_t sLength = strlen(verify_long_options[i].name);
-        sLongestOpt = std::max<size_t>(sLongestOpt, sLength);
-    }
-
-    std::cout << "Usage: " << argv[0] << " " << argv[1] << std::endl;
-    for (unsigned int i = 0; i < NOptOptions; i++)
-    {
-        size_t sLength = strlen(verify_long_options[i].name);
-        std::cout << "\t-" << (char)verify_long_options[i].val << " --"
-                  << verify_long_options[i].name;
-        for (size_t j = 0; j < (sLongestOpt - sLength); j++)
-        {
-            std::cout << " ";
-        }
-        std::cout << " | " << verify_options_description[i] << std::endl;
-    }
-}
-
 bool verifyValidateArgs(const VerifyArguments& args)
 {
     bool sIsValidArgs = true;
@@ -185,7 +161,8 @@ CeLogin::CeLoginRc cli::verifyHsf(int argc, char** argv)
 
     if (sArgs.mHelp)
     {
-        verifyPrintHelp(argc, argv);
+        cli::printHelp(argv[0], argv[1], "", verify_long_options,
+                       verify_options_description, NOptOptions);
     }
     else if (verifyValidateArgs(sArgs))
     {
@@ -268,7 +245,7 @@ CeLogin::CeLoginRc cli::verifyHsf(int argc, char** argv)
                         break;
                     }
                 }
-                printf("Expiration (UNIX): %llu\n", sExpiration);
+                std::cout << "Expiration (UNIX): " << sExpiration << std::endl;
             }
             else
             {

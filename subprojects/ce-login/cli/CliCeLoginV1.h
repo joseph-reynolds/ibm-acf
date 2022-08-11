@@ -49,7 +49,8 @@ struct CeLoginCreateHsfArgsV1
     std::vector<CeLogin::Machine> mMachines;
     std::string mExpirationDate;
     std::string mRequestId;
-    std::string mPassword;
+    const char* mPasswordPtr;
+    std::size_t mPasswordLength;
     PasswordHashAlgorithm mPasswordHashAlgorithm;
     std::vector<uint8_t> mPrivateKey;
     std::size_t mSaltLength;
@@ -93,6 +94,10 @@ CeLoginRc
     decodeAndVerifyCeLoginHsfV1(const std::vector<uint8_t>& hsfParm,
                                 const std::vector<uint8_t>& publicKeyParm,
                                 CeLoginDecryptedHsfArgsV1& decodedHsfParm);
+
+CeLoginRc generateRandomPassword(char* dstParm, const uint64_t dstSizeParm);
+
+CeLogin::CeLoginRc getLocalRequestId(std::string& dstParm);
 
 }; // namespace CeLogin
 
