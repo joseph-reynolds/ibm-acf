@@ -9,6 +9,7 @@ project(
         'cpp_std=c++11'
     ]
 )
+cpp = meson.get_compiler('cpp')
 
 #dependencies
 cxx = meson.get_compiler('cpp')
@@ -53,8 +54,12 @@ else
     endif
 endif
 
-#Fetches jsmn header library
-jsmn = dependency('jsmn', required : true, fallback : ['jsmn', 'jsmn_dep'])
+#Fetches jsmn header library if not found
+if cpp.has_header('jsmn.h')
+    jsmn = declare_dependency()
+else
+    jsmn = dependency('jsmn', required : true, fallback : ['jsmn', 'jsmn_dep'])
+endif
 lib_deps = [ libcrypto, libssl, jsmn ]
 
 #includes
