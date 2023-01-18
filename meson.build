@@ -1,7 +1,7 @@
 project('pam_ibmacf',
         'c' ,
         'cpp',
-        default_options : ['cpp_std=c++17'],
+        default_options : ['cpp_std=c++20'],
         meson_version : '>=0.56.0')
 
 cxx = meson.get_compiler('cpp')
