@@ -1,6 +1,7 @@
 
 #include "CeLoginJson.h"
 
+#include "CeLoginUtil.h"
 #include "JsmnUtils.h"
 
 #include <CeLogin.h>
@@ -67,6 +68,16 @@ static CeLoginRc
                              const uint64_t saltTokenIdxParm,
                              uint64_t& iterationsParm);
 
+static CeLoginRc ParseServiceLoginFields(
+    const JsmnUtils::JsmnState& jsmnStateParm, const AcfVersion versionParm,
+    const char* serialNumberParm, const uint64_t serialNumberLengthParm,
+    CeLoginJsonData& decodedJsonParm);
+
+static CeLoginRc ParseAdminResetFields(
+    const JsmnUtils::JsmnState& jsmnStateParm, const AcfVersion versionParm,
+    const char* serialNumberParm, const uint64_t serialNumberLengthParm,
+    CeLoginJsonData& decodedJsonParm);
+
 CeLoginRc CeLogin::decodeJson(const char* jsonStringParm,
                               const uint64_t jsonStringLengthParm,
                               const char* serialNumberParm,
@@ -74,6 +85,12 @@ CeLoginRc CeLogin::decodeJson(const char* jsonStringParm,
                               CeLoginJsonData& decodedJsonParm)
 {
     CeLoginRc sRc = CeLoginRc::Success;
+    AcfVersion sVersion = CeLoginInvalidVersion;
+    AcfType sAcfType = AcfType_Invalid;
+
+    // Used to parse fields in the highest level json object
+    const uint64_t sRootObjectTokenIdx = 0;
+
     jsmn_parser sJsmnParser;
     jsmntok_t sJsmnTokens[JsonUtils::JsmnMaxNumTokens];
 
@@ -88,9 +105,10 @@ CeLoginRc CeLogin::decodeJson(const char* jsonStringParm,
     }
 
     // This is a hardcoded parser. It expects the ACF JSON to look something
-    // like this:
+    // like this (for a service ACF):
     // {
-    //     "version":1,
+    //     "version":2,
+    //     "type":"service",
     //     "machines":
     //         [
     //             { "serialNumber":"000020012345", "frameworkEc":"PWR10S" },
@@ -100,7 +118,8 @@ CeLoginRc CeLogin::decodeJson(const char* jsonStringParm,
     //     “salt”:”xxxxxxxxx”,
     //     “iterations”:”10000”,
     //     "expiration":"2018-12-25",
-    //     "requestId":"FACE0FF0"
+    //     "requestId":"FACE0FF0",
+    //     "replayId":"153623423"
     // }
 
     // Wrap the json string and tokens array in a nice way
@@ -122,36 +141,36 @@ CeLoginRc CeLogin::decodeJson(const char* jsonStringParm,
     }
 
     // Step 2: Now that we know it is an Object, look for the "Names" associated
-    // with all of the "Values" in the top level object. For CeLogin, the
-    // top-level names we care about are:
-    //      - "versions"
-    //      - "machines"
-    //      - "hashedAuthCode"
+    // with all of the "Values" in the top level object. For CeLogin, we first
+    // parse the attributes that are common to all ACF types:
+    //      - "version"
     //      - "expiration"
+    //      - "replayid"
+    //      - "machines"
+    //      - "type"
+    // For the service ACF, we also have the following fields:
+    //      - "hashedAuthCode"
     //      - "salt"
     //      - "iterations"
+    // For the admin reset ACF, we also have the following fields:
+    //      - "adminAuthCode"
     // Any others are ignored. If a duplicate is detected, then an error will be
     // returned.
 
     uint64_t sVersionIdx = 0;
-    uint64_t sMachinesIdx = 0;
-    uint64_t sHashedAuthCodeIdx = 0;
-    uint64_t sSaltIdx = 0;
-    uint64_t sIterationsIdx = 0;
-    uint64_t sExpirationIdx = 0;
-
-    const uint64_t sObjectTokenIdx = 0; // Index of the root token
+    uint64_t sTypeIdx = 0;
+    uint64_t sReplayIdIdx = 0;
 
     // Parse Version first, before parsing other things. Validate that the
     // version is correct before attempting to parse anything else
     if (CeLoginRc::Success == sRc)
     {
-        uint64_t sVersion = CeLoginInvalidVersion;
+        uint64_t sParsedVersion = 0;
 
         // Get the token for the version integer
         JsmnUtils::JsmnUtilRc sJsmnRc = JsmnUtils::Success;
         sJsmnRc = JsmnUtils::ObjectGetValueByKey(
-            sJsmnState, sObjectTokenIdx, JsonName_Version,
+            sJsmnState, sRootObjectTokenIdx, JsonName_Version,
             strlen(JsonName_Version), sVersionIdx);
         sRc = CeLoginRc(CeLoginRc::JsmnUtils, sJsmnRc);
 
@@ -162,102 +181,108 @@ CeLoginRc CeLogin::decodeJson(const char* jsonStringParm,
                 sJsmnState.getString(sVersionIdx);
             sRc = getUnsignedIntegerFromString(sVersionString.mCharArray,
                                                sVersionString.mCharLength,
-                                               sVersion);
+                                               sParsedVersion);
         }
 
-        // Determine if the version is supported
         if (CeLoginRc::Success == sRc)
         {
-            if (CeLoginVersion1 != sVersion)
+            if (CeLoginVersion1 == sParsedVersion ||
+                CeLoginVersion2 == sParsedVersion)
+            {
+                sVersion = (AcfVersion)sParsedVersion;
+                decodedJsonParm.mVersion = sVersion;
+            }
+            else
             {
                 sRc = CeLoginRc::UnsupportedVersion;
             }
         }
     }
 
-    // If there is ever a V2 JSON Payload, the rest of this logic should be
-    // wrapped in function specific to V1 parsing.
+    // Parse ACF type first, if it exists
     if (CeLoginRc::Success == sRc)
     {
-        JsmnUtils::JsmnUtilRc sJsmnRc = JsmnUtils::Success;
-
-        if (JsmnUtils::Success == sJsmnRc)
+        if (CeLoginVersion1 == sVersion)
         {
-            sJsmnRc = JsmnUtils::ObjectGetValueByKey(
-                sJsmnState, sObjectTokenIdx, JsonName_Machines,
-                strlen(JsonName_Machines), sMachinesIdx);
+            // Version one only supports service ACFs
+            sAcfType = AcfType_Service;
+        }
+        else
+        {
+            JsmnUtils::JsmnUtilRc sJsmnRc = JsmnUtils::ObjectGetValueByKey(
+                sJsmnState, sRootObjectTokenIdx, JsonName_Type,
+                strlen(JsonName_Type), sTypeIdx);
+
+            if (JsmnUtils::Success == sJsmnRc)
+            {
+                JsmnUtils::JsmnString sTypeStr = sJsmnState.getString(sTypeIdx);
+                if (JsmnUtils::SafeJsmnStringCompare(
+                        sTypeStr, JsonValue_AcfTypeService,
+                        strlen(JsonValue_AcfTypeService)))
+                {
+                    sAcfType = AcfType_Service;
+                }
+                else if (JsmnUtils::SafeJsmnStringCompare(
+                             sTypeStr, JsonValue_AcfTypeAdminReset,
+                             strlen(JsonValue_AcfTypeAdminReset)))
+                {
+                    sAcfType = AcfType_AdminReset;
+                }
+                else
+                {
+                    sRc = CeLoginRc::UnsupportedAcfType;
+                }
+            }
+            else
+            {
+                sRc = CeLoginRc(CeLoginRc::JsmnUtils, sJsmnRc);
+                sAcfType = AcfType_Invalid;
+            }
         }
 
-        if (JsmnUtils::Success == sJsmnRc)
+        decodedJsonParm.mType = sAcfType;
+    }
+
+    // Parse replay ID if exists
+    if (CeLoginRc::Success == sRc && sVersion == CeLoginVersion2)
+    {
+        JsmnUtils::JsmnUtilRc sTmpRc = JsmnUtils::ObjectGetValueByKey(
+            sJsmnState, sRootObjectTokenIdx, JsonName_ReplayId,
+            strlen(JsonName_ReplayId), sReplayIdIdx);
+
+        if (JsmnUtils::Success == sTmpRc)
         {
-            sJsmnRc = JsmnUtils::ObjectGetValueByKey(
-                sJsmnState, sObjectTokenIdx, JsonName_HashedAuthCode,
-                strlen(JsonName_HashedAuthCode), sHashedAuthCodeIdx);
+            decodedJsonParm.mReplayInfo.mReplayIdPresent = true;
+            JsmnUtils::JsmnString sReplayIdStr =
+                sJsmnState.getString(sReplayIdIdx);
+            sRc = CeLogin::getUnsignedIntegerFromString(
+                sReplayIdStr.mCharArray, sReplayIdStr.mCharLength,
+                decodedJsonParm.mReplayInfo.mReplayId);
         }
+    }
 
-        if (JsmnUtils::Success == sJsmnRc)
+    // Parse AdminReset ACF type
+    if (CeLoginRc::Success == sRc && AcfType_AdminReset == sAcfType)
+    {
+        if (decodedJsonParm.mReplayInfo.mReplayIdPresent)
         {
-            sJsmnRc = JsmnUtils::ObjectGetValueByKey(
-                sJsmnState, sObjectTokenIdx, JsonName_Salt,
-                strlen(JsonName_Salt), sSaltIdx);
+            sRc =
+                ParseAdminResetFields(sJsmnState, sVersion, serialNumberParm,
+                                      serialNumberLengthParm, decodedJsonParm);
         }
-
-        if (JsmnUtils::Success == sJsmnRc)
+        else
         {
-            sJsmnRc = JsmnUtils::ObjectGetValueByKey(
-                sJsmnState, sObjectTokenIdx, JsonName_Iterations,
-                strlen(JsonName_Iterations), sIterationsIdx);
+            sRc = CeLoginRc::MissingReplayId;
         }
-
-        if (JsmnUtils::Success == sJsmnRc)
-        {
-            sJsmnRc = JsmnUtils::ObjectGetValueByKey(
-                sJsmnState, sObjectTokenIdx, JsonName_Expiration,
-                strlen(JsonName_Expiration), sExpirationIdx);
-        }
-        // Automatically converts JsmnUtils::Success to CeLoginRc::Success
-        sRc = CeLoginRc(CeLoginRc::JsmnUtils, sJsmnRc);
     }
 
-    // parse expiration date
-    if (CeLoginRc::Success == sRc)
+    // Parse Service ACF type
+    if (CeLoginRc::Success == sRc && AcfType_Service == sAcfType)
     {
-        sRc = ParseDateFromToken(sJsmnState, sExpirationIdx,
-                                 decodedJsonParm.mExpirationDate);
+        sRc = ParseServiceLoginFields(sJsmnState, sVersion, serialNumberParm,
+                                      serialNumberLengthParm, decodedJsonParm);
     }
 
-    // parse hashed auth code
-    if (CeLoginRc::Success == sRc)
-    {
-        sRc = ParseHashedAuthCodeFromToken(
-            sJsmnState, sHashedAuthCodeIdx, decodedJsonParm.mHashedAuthCode,
-            sizeof(decodedJsonParm.mHashedAuthCode),
-            decodedJsonParm.mHashedAuthCodeLength);
-    }
-
-    // parse salt
-    if (CeLoginRc::Success == sRc)
-    {
-        sRc = ParseSaltFromToken(sJsmnState, sSaltIdx,
-                                 decodedJsonParm.mAuthCodeSalt,
-                                 sizeof(decodedJsonParm.mAuthCodeSalt),
-                                 decodedJsonParm.mAuthCodeSaltLength);
-    }
-
-    // parse number of iterations
-    if (CeLoginRc::Success == sRc)
-    {
-        sRc = ParseIterationsFromToken(sJsmnState, sIterationsIdx,
-                                       decodedJsonParm.mIterations);
-    }
-
-    // parse machines
-    if (CeLoginRc::Success == sRc)
-    {
-        sRc = ParseAuthorityFromMachineArrayToken(
-            sJsmnState, sMachinesIdx, serialNumberParm, serialNumberLengthParm,
-            decodedJsonParm.mRequestedAuthority);
-    }
     return sRc;
 }
 
@@ -527,5 +552,182 @@ CeLoginRc ParseIterationsFromToken(const JsmnUtils::JsmnState& jsmnStateParm,
                                                iterationsParm);
         }
     }
+    return sRc;
+}
+
+CeLoginRc ParseServiceLoginFields(const JsmnUtils::JsmnState& jsmnStateParm,
+                                  const AcfVersion versionParm,
+                                  const char* serialNumberParm,
+                                  const uint64_t serialNumberLengthParm,
+                                  CeLoginJsonData& decodedJsonParm)
+{
+    CeLoginRc sRc = CeLoginRc::Success;
+    JsmnUtils::JsmnUtilRc sJsmnRc = JsmnUtils::Success;
+
+    const uint64_t sRootObjectTokenIdx = 0;
+
+    uint64_t sMachinesIdx = 0;
+    uint64_t sExpirationIdx = 0;
+    uint64_t sHashedAuthCodeIdx = 0;
+    uint64_t sSaltIdx = 0;
+    uint64_t sIterationsIdx = 0;
+
+    // Parse remaining fields
+    if (CeLoginRc::Success == sRc)
+    {
+        if (JsmnUtils::Success == sJsmnRc)
+        {
+            sJsmnRc = JsmnUtils::ObjectGetValueByKey(
+                jsmnStateParm, sRootObjectTokenIdx, JsonName_Machines,
+                strlen(JsonName_Machines), sMachinesIdx);
+        }
+
+        if (JsmnUtils::Success == sJsmnRc)
+        {
+            sJsmnRc = JsmnUtils::ObjectGetValueByKey(
+                jsmnStateParm, sRootObjectTokenIdx, JsonName_HashedAuthCode,
+                strlen(JsonName_HashedAuthCode), sHashedAuthCodeIdx);
+        }
+
+        if (JsmnUtils::Success == sJsmnRc)
+        {
+            sJsmnRc = JsmnUtils::ObjectGetValueByKey(
+                jsmnStateParm, sRootObjectTokenIdx, JsonName_Salt,
+                strlen(JsonName_Salt), sSaltIdx);
+        }
+
+        if (JsmnUtils::Success == sJsmnRc)
+        {
+            sJsmnRc = JsmnUtils::ObjectGetValueByKey(
+                jsmnStateParm, sRootObjectTokenIdx, JsonName_Iterations,
+                strlen(JsonName_Iterations), sIterationsIdx);
+        }
+
+        if (JsmnUtils::Success == sJsmnRc)
+        {
+            sJsmnRc = JsmnUtils::ObjectGetValueByKey(
+                jsmnStateParm, sRootObjectTokenIdx, JsonName_Expiration,
+                strlen(JsonName_Expiration), sExpirationIdx);
+        }
+
+        // Automatically converts JsmnUtils::Success to CeLoginRc::Success
+        sRc = CeLoginRc(CeLoginRc::JsmnUtils, sJsmnRc);
+    }
+
+    // parse expiration date
+    if (CeLoginRc::Success == sRc)
+    {
+        sRc = ParseDateFromToken(jsmnStateParm, sExpirationIdx,
+                                 decodedJsonParm.mExpirationDate);
+    }
+
+    // parse hashed auth code
+    if (CeLoginRc::Success == sRc)
+    {
+        sRc = ParseHashedAuthCodeFromToken(
+            jsmnStateParm, sHashedAuthCodeIdx, decodedJsonParm.mHashedAuthCode,
+            sizeof(decodedJsonParm.mHashedAuthCode),
+            decodedJsonParm.mHashedAuthCodeLength);
+    }
+
+    // parse salt
+    if (CeLoginRc::Success == sRc)
+    {
+        sRc = ParseSaltFromToken(jsmnStateParm, sSaltIdx,
+                                 decodedJsonParm.mAuthCodeSalt,
+                                 sizeof(decodedJsonParm.mAuthCodeSalt),
+                                 decodedJsonParm.mAuthCodeSaltLength);
+    }
+
+    // parse number of iterations
+    if (CeLoginRc::Success == sRc)
+    {
+        sRc = ParseIterationsFromToken(jsmnStateParm, sIterationsIdx,
+                                       decodedJsonParm.mIterations);
+    }
+
+    // parse machines
+    if (CeLoginRc::Success == sRc)
+    {
+        sRc = ParseAuthorityFromMachineArrayToken(
+            jsmnStateParm, sMachinesIdx, serialNumberParm,
+            serialNumberLengthParm, decodedJsonParm.mRequestedAuthority);
+    }
+
+    return sRc;
+}
+
+CeLoginRc ParseAdminResetFields(const JsmnUtils::JsmnState& jsmnStateParm,
+                                const AcfVersion versionParm,
+                                const char* serialNumberParm,
+                                const uint64_t serialNumberLengthParm,
+                                CeLoginJsonData& decodedJsonParm)
+{
+    CeLoginRc sRc = CeLoginRc::Success;
+    JsmnUtils::JsmnUtilRc sJsmnRc = JsmnUtils::Success;
+
+    const uint64_t sRootObjectTokenIdx = 0;
+
+    uint64_t sMachinesIdx = 0;
+    uint64_t sExpirationIdx = 0;
+    uint64_t sAdminAuthCodeIdx = 0;
+
+    if (JsmnUtils::Success == sJsmnRc)
+    {
+        sJsmnRc = JsmnUtils::ObjectGetValueByKey(
+            jsmnStateParm, sRootObjectTokenIdx, JsonName_Machines,
+            strlen(JsonName_Machines), sMachinesIdx);
+    }
+
+    if (JsmnUtils::Success == sJsmnRc)
+    {
+        sJsmnRc = JsmnUtils::ObjectGetValueByKey(
+            jsmnStateParm, sRootObjectTokenIdx, JsonName_Expiration,
+            strlen(JsonName_Expiration), sExpirationIdx);
+    }
+
+    if (JsmnUtils::Success == sJsmnRc)
+    {
+        sJsmnRc = JsmnUtils::ObjectGetValueByKey(
+            jsmnStateParm, sRootObjectTokenIdx, JsonName_AdminAuthCode,
+            strlen(JsonName_AdminAuthCode), sAdminAuthCodeIdx);
+    }
+
+    // Parsing complete, start using CeLogin return codes
+    sRc = CeLoginRc(CeLoginRc::JsmnUtils, sJsmnRc);
+
+    // verify machines
+    if (CeLoginRc::Success == sRc)
+    {
+        ServiceAuthority sIgnoredAuth;
+        sRc = ParseAuthorityFromMachineArrayToken(
+            jsmnStateParm, sMachinesIdx, serialNumberParm,
+            serialNumberLengthParm, sIgnoredAuth);
+    }
+
+    // get expiration date
+    if (CeLoginRc::Success == sRc)
+    {
+        sRc = ParseDateFromToken(jsmnStateParm, sExpirationIdx,
+                                 decodedJsonParm.mExpirationDate);
+    }
+
+    // Copy out adminAuthCode
+    if (CeLoginRc::Success == sRc)
+    {
+        JsmnUtils::JsmnString sAdminAuthStr =
+            jsmnStateParm.getString(sAdminAuthCodeIdx);
+        if (sAdminAuthStr.mCharLength <= CeLogin_MaxHashedAuthCodeLength)
+        {
+            memcpy(decodedJsonParm.mAdminAuthCode, sAdminAuthStr.mCharArray,
+                   sAdminAuthStr.mCharLength);
+            decodedJsonParm.mAdminAuthCodeLength = sAdminAuthStr.mCharLength;
+        }
+        else
+        {
+            sRc = CeLoginRc::Failure;
+        }
+    }
+
     return sRc;
 }
