@@ -221,10 +221,12 @@ CeLoginRc CeLogin::checkAuthorizationAndGetAcfUserFieldsV2(
             }
             else
             {
-                memcpy(userFieldsParm.mAdminResetFields.mAdminAuthCode,
-                       sJsonData->mAdminAuthCode,
-                       sJsonData->mAdminAuthCodeLength);
-                userFieldsParm.mAdminResetFields.mAdminAuthCodeLength = sJsonData->mAdminAuthCodeLength;
+		// Reconstruct the ASCII version from hex
+		sRc = CeLogin::getBinaryFromHex((const char*)sJsonData->mAdminAuthCode,
+				                sJsonData->mAdminAuthCodeLength,
+						(uint8_t*)userFieldsParm.mAdminResetFields.mAdminAuthCode,
+						CeLogin::AdminAuthCodeMaxLen,
+						userFieldsParm.mAdminResetFields.mAdminAuthCodeLength);
             }
         }
         else if (AcfType_Service == sJsonData->mType)

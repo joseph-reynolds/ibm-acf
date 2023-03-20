@@ -29,7 +29,7 @@ enum AcfVersion
 enum
 {
     CeLogin_PBKDF2_Iterations = 100000,
-    AdminAuthCodeMaxLen = 128,
+    AdminAuthCodeMaxLen = 256,
 };
 
 enum AcfType

@@ -27,7 +27,7 @@ enum
     CeLogin_Digest_NID = NID_sha512, // Used for OpenSSL RSA sign/verify routine
     CeLogin_DigestLength = SHA512_DIGEST_LENGTH,
 
-    CeLogin_MaxHashedAuthCodeLength = 128,
+    CeLogin_MaxHashedAuthCodeLength = 256,
     CeLogin_MaxHashedAuthCodeSaltLength = 128,
 
     CeLogin_MaxNumberOfJsonTokens = 128, // somewhat arbitrary right now
