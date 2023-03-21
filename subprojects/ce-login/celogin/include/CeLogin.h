@@ -227,6 +227,32 @@ struct AcfUserFields
     const uint64_t serialNumberLengthParm, ServiceAuthority& authorityParm,
     uint64_t& expirationTimeParm);
 
+/** @brief Sanity check an ACF file (excluding password validation)
+ *
+ *  This function decodes and verifies several aspects of the provided ACF file.
+ *  This includes verifying the signature over the ACF, ensuring the ACF is not expired,
+ *  checking the serial number fields.
+ *
+ *  @param accessControlFileParm a pointer to the ASN1 encoded binary ACF
+ *  @param accessControlFileLengthParm the length of the provided ACF
+ *  @param timeSinceUnixEpochInSecondsParm the current system time encoded as a unix timestamp
+ *  @param publicKeyParm a pointer to the public key used to vaidate the signature over the ACF
+ *  @param publicKeyLengthParm the length of the provided public key
+ *  @param serialNumberParm a pointer to the serial number of the current system
+ *  @param serialNumberLengthParm the length of the provided serial number
+ *  @param expirationTimeParm a unix timestamp indicating when the ACF expires
+ *
+ *  @return A CeLoginRc indicating the result. CeLoginRc::Success indicates that the ACF is
+ *          valid (excluding password validation).
+ */
+CeLoginRc checkAcfIntegrityV2(
+    const uint8_t* accessControlFileParm,
+    const uint64_t accessControlFileLengthParm,
+    const uint64_t timeSinceUnixEpochInSecondsParm,
+    const uint8_t* publicKeyParm, const uint64_t publicKeyLengthParm,
+    const char* serialNumberParm, const uint64_t serialNumberLengthParm,
+    uint64_t& expirationTimeParm);
+
 /** @brief Validate an ACF file and parse out the relevant fields
  *
  *  This function decodes and verifies several aspects of the provided ACF file.

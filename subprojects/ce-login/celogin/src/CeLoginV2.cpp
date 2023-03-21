@@ -89,6 +89,90 @@ static CeLoginRc validateAndParseAcfV2(
     return sRc;
 }
 
+CeLoginRc CeLogin::checkAcfIntegrityV2(
+    const uint8_t* accessControlFileParm,
+    const uint64_t accessControlFileLengthParm,
+    const uint64_t timeSinceUnixEpochInSecondsParm,
+    const uint8_t* publicKeyParm, const uint64_t publicKeyLengthParm,
+    const char* serialNumberParm, const uint64_t serialNumberLengthParm,
+    uint64_t& expirationTimeParm)
+{
+    CeLoginRc sRc = CeLoginRc::Success;
+    CeLoginJsonData* sJsonData = NULL;
+
+    if (!accessControlFileParm)
+    {
+        sRc = CeLoginRc::GetSevAuth_InvalidAcfPtr;
+    }
+    else if (0 == accessControlFileLengthParm)
+    {
+        sRc = CeLoginRc::GetSevAuth_InvalidAcfLength;
+    }
+    else if (!publicKeyParm)
+    {
+        sRc = CeLoginRc::GetSevAuth_InvalidPublicKeyPtr;
+    }
+    else if (0 == publicKeyLengthParm)
+    {
+        sRc = CeLoginRc::GetSevAuth_InvalidPublicKeyLength;
+    }
+    else if (!serialNumberParm)
+    {
+        sRc = CeLoginRc::GetSevAuth_InvalidSerialNumberPtr;
+    }
+    else if (0 == serialNumberLengthParm)
+    {
+        sRc = CeLoginRc::GetSevAuth_InvalidSerialNumberLength;
+    }
+
+    // Allocate on heap to avoid blowing the stack
+    if (CeLoginRc::Success == sRc)
+    {
+        sJsonData = (CeLoginJsonData*)OPENSSL_malloc(sizeof(CeLoginJsonData));
+        if (sJsonData)
+        {
+            new (sJsonData) CeLoginJsonData();
+        }
+        else
+        {
+            sRc = CeLoginRc::JsonDataAllocationFailure;
+        }
+    }
+    // Stack copy to store the parsed expiration time into. Only pass back
+    // the value if the authority has validated as CE or Dev.
+    uint64_t sExpirationTime = 0;
+
+    if (CeLoginRc::Success == sRc)
+    {
+        sRc = validateAndParseAcfV2(accessControlFileParm, accessControlFileLengthParm,
+                  timeSinceUnixEpochInSecondsParm, publicKeyParm, publicKeyLengthParm,
+                  serialNumberParm, serialNumberLengthParm, *sJsonData, sExpirationTime);
+    }
+
+    // This interface only supports V1 and V2
+    if (CeLoginRc::Success == sRc)
+    {
+        if (CeLoginVersion1 != sJsonData->mVersion &&
+            CeLoginVersion2 != sJsonData->mVersion)
+        {
+            sRc = CeLoginRc::UnsupportedVersion;
+        }
+    }
+
+    if (CeLoginRc::Success == sRc)
+    {
+        expirationTimeParm = sExpirationTime;
+    }
+
+    if (sJsonData)
+    {
+        sJsonData->~CeLoginJsonData();
+        OPENSSL_free(sJsonData);
+    }
+
+    return sRc;
+}
+
 CeLoginRc CeLogin::checkAuthorizationAndGetAcfUserFieldsV2(
     const uint8_t* accessControlFileParm, const uint64_t accessControlFileLengthParm,
     const char* passwordParm, const uint64_t passwordLengthParm,
