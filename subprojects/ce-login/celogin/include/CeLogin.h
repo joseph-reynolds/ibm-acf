@@ -210,8 +210,6 @@ struct AcfUserFields
     } mTypeSpecificFields;
 };
 
-#ifndef CELOGIN_POWERVM_TARGET
-
 /// @note This function will return failure if called with a V2 ACF
 CeLoginRc getServiceAuthorityV1(
     const uint8_t* accessControlFileParm,
@@ -230,6 +228,37 @@ CeLoginRc checkServiceAuthorityAcfIntegrityV1(
     const uint64_t publicKeyLengthParm, const char* serialNumberParm,
     const uint64_t serialNumberLengthParm, ServiceAuthority& authorityParm,
     uint64_t& expirationTimeParm);
+
+/** @brief Extract metadata from an ACF
+ *
+ *  This function validates a few ACF fields, but only those minimally required to
+ *  read certain metadata fields. Full validation of the ACF will need to use the
+ *  upload interface.
+ *
+ *  @param accessControlFileParm a pointer to the ASN1 encoded binary ACF
+ *  @param accessControlFileLengthParm the length of the provided ACF
+ *  @param timeSinceUnixEpochInSecondsParm the current system time encoded as a unix timestamp
+ *  @param publicKeyParm a pointer to the public key used to vaidate the signature over the ACF
+ *  @param publicKeyLengthParm the length of the provided public key
+ *  @param serialNumberParm a pointer to the serial number of the current system
+ *  @param serialNumberLengthParm the length of the provided serial number
+ *  @param acfTypeParm the AcfType parsed from the provided file (e.g. service or admin reset)
+ *  @param expirationTimeParm the time at which this ACF expires
+ *
+ *  @return A CeLoginRc indicating the result. CeLoginRc::Success indicates that the ACF is
+ *          valid and the output fields have been populated with the relevant data from the
+ *          file.
+ */
+CeLoginRc extractACFMetadataV2(
+    const uint8_t* accessControlFileParm,
+    const uint64_t accessControlFileLengthParm,
+    const uint64_t timeSinceUnixEpochInSecondsParm,
+    const uint8_t* publicKeyParm, const uint64_t publicKeyLengthParm,
+    const char* serialNumberParm, const uint64_t serialNumberLengthParm,
+    AcfType& acfTypeParm, uint64_t& expirationTimeParm,
+    AcfVersion& versionParm, bool& hasReplayIdParm);
+
+#ifndef CELOGIN_POWERVM_TARGET
 
 /** @brief Validate an ACF file at upload time
  *
