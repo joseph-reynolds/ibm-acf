@@ -27,7 +27,7 @@ enum
     CeLogin_Digest_NID = NID_sha512, // Used for OpenSSL RSA sign/verify routine
     CeLogin_DigestLength = SHA512_DIGEST_LENGTH,
 
-    CeLogin_MaxHashedAuthCodeLength = 128,
+    CeLogin_MaxHashedAuthCodeLength = 256,
     CeLogin_MaxHashedAuthCodeSaltLength = 128,
 
     CeLogin_MaxNumberOfJsonTokens = 128, // somewhat arbitrary right now
@@ -46,12 +46,11 @@ CeLoginRc getDateFromString(const char* dateStringParm,
 
 CeLoginRc getAsn1Time(const CeLogin_Date& dateParm, ASN1_TIME* timeParm);
 
-
 CeLoginRc decodeAndVerifySignature(const uint8_t* accessControlFileParm,
-                             const uint64_t accessControlFileLengthParm,
-                             const uint8_t* publicKeyParm,
-                             uint64_t publicKeyLengthParm,
-                             CELoginSequenceV1*& decodedAsnParm);
+                                   const uint64_t accessControlFileLengthParm,
+                                   const uint8_t* publicKeyParm,
+                                   uint64_t publicKeyLengthParm,
+                                   CELoginSequenceV1*& decodedAsnParm);
 
 CeLoginRc decodeAndVerifyAcf(const uint8_t* accessControlFileParm,
                              const uint64_t accessControlFileLengthParm,

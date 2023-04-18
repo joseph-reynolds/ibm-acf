@@ -8,13 +8,15 @@
 #include <openssl/x509.h>
 #include <string.h>
 
+#include <new>
+
 namespace CeLogin
 {
 const char* AcfProcessingType = "P";
 };
 
 CeLogin::CeLoginRc
-    CeLogin::isTimeExpired(CeLoginJsonData* jsonDataParm,
+    CeLogin::isTimeExpired(const CeLoginJsonData* jsonDataParm,
                            uint64_t& expirationTimeParm,
                            const uint64_t timeSinceUnixEpocInSecondsParm)
 {
@@ -141,7 +143,7 @@ CeLogin::CeLoginRc CeLogin::getServiceAuthorityV1(
         sJsonData = (CeLoginJsonData*)OPENSSL_malloc(sizeof(CeLoginJsonData));
         if (sJsonData)
         {
-            memset(sJsonData, 0x00, sizeof(CeLoginJsonData));
+            new (sJsonData) CeLoginJsonData();
         }
         else
         {
@@ -171,6 +173,15 @@ CeLogin::CeLoginRc CeLogin::getServiceAuthorityV1(
         sRc = decodeJson((const char*)sDecodedAsn->sourceFileData->data,
                          sDecodedAsn->sourceFileData->length, serialNumberParm,
                          serialNumberLengthParm, *sJsonData);
+    }
+
+    // This interface only supports V1
+    if (CeLoginRc::Success == sRc)
+    {
+        if (CeLoginVersion1 != sJsonData->mVersion)
+        {
+            sRc = CeLoginRc::UnsupportedVersion;
+        }
     }
 
     // Verify that the ACF has not expired (using UTC)
@@ -207,9 +218,14 @@ CeLogin::CeLoginRc CeLogin::getServiceAuthorityV1(
     }
 
     if (sDecodedAsn)
+    {
         CELoginSequenceV1_free(sDecodedAsn);
+    }
     if (sJsonData)
+    {
+        sJsonData->~CeLoginJsonData();
         OPENSSL_free(sJsonData);
+    }
 
     return sRc;
 }
@@ -259,7 +275,7 @@ CeLogin::CeLoginRc CeLogin::checkServiceAuthorityAcfIntegrityV1(
         sJsonData = (CeLoginJsonData*)OPENSSL_malloc(sizeof(CeLoginJsonData));
         if (sJsonData)
         {
-            memset(sJsonData, 0x00, sizeof(CeLoginJsonData));
+            new (sJsonData) CeLoginJsonData();
         }
         else
         {
@@ -291,6 +307,15 @@ CeLogin::CeLoginRc CeLogin::checkServiceAuthorityAcfIntegrityV1(
                          serialNumberLengthParm, *sJsonData);
     }
 
+    // This interface only supports V1
+    if (CeLoginRc::Success == sRc)
+    {
+        if (CeLoginVersion1 != sJsonData->mVersion)
+        {
+            sRc = CeLoginRc::UnsupportedVersion;
+        }
+    }
+
     // Verify that the ACF has not expired (using UTC)
     if (CeLoginRc::Success == sRc)
     {
@@ -307,7 +332,10 @@ CeLogin::CeLoginRc CeLogin::checkServiceAuthorityAcfIntegrityV1(
     if (sDecodedAsn)
         CELoginSequenceV1_free(sDecodedAsn);
     if (sJsonData)
+    {
+        sJsonData->~CeLoginJsonData();
         OPENSSL_free(sJsonData);
+    }
 
     return sRc;
 }

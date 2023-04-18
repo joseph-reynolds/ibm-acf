@@ -68,6 +68,7 @@ inc_dir = include_directories(['celogin/include', './cli', 'celogin/src' ])
 #sources
 ce_login_sources = ['celogin/src/CeLoginAsnV1.cpp',
                     'celogin/src/CeLogin.cpp',
+                    'celogin/src/CeLoginV2.cpp',
                     'celogin/src/CeLoginJson.cpp',
                     'celogin/src/CeLoginJsonExterns.cpp',
                     'celogin/src/CeLoginUtil.cpp',
@@ -89,7 +90,7 @@ cli_sources = [ 'cli/CliCeLoginV1.cpp',
 all_srcs = ce_login_sources + cli_sources
 
 #compiler arguments
-args = ['-O2', '-DMFG_IBMI_TARGET']
+args = ['-O2']
 
 #library target
 if get_option('lib')
