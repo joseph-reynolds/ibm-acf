@@ -12,6 +12,7 @@
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <vector>
 
 int main(int argc, char** argv)
 {
@@ -28,8 +29,31 @@ int main(int argc, char** argv)
         }
         else if (0 == strcmp(argv[1], "create_prod"))
         {
+            int version = 1;
+            std::vector<char*> sArgv;
+
+            for(int sIdx = 0; sIdx < argc; sIdx++)
+            {
+                std::string flag(argv[sIdx]);
+                if(flag == "-v2" || flag == "-V2" || flag == "--v2" || flag == "--V2")
+                {
+                    version = 2;
+                }
+                else
+                {
+                    sArgv.push_back(argv[sIdx]);
+                }
+            }
+
             sPrintHelp = false;
-            sRc = cli::createProductionHsf(argc, argv);
+            if(2 == version)
+            {
+                sRc = cli::createProductionHsfV2(sArgv.size(), sArgv.data());
+            }
+            else
+            {
+                sRc = cli::createProductionHsf(sArgv.size(), sArgv.data());
+            }
         }
         else if (0 == strcmp(argv[1], "decode"))
         {
@@ -52,12 +76,12 @@ int main(int argc, char** argv)
     {
         std::cout << "Usage:" << std::endl;
         std::cout << "    " << argv[0]
-                  << " [create_prod|create|decode|verify|test] <args>"
+                  << " [create_prod|create|decode|verify|test] [-v2] <args>"
                   << std::endl;
         std::cout << std::endl;
         std::cout << "Command Help Text:" << std::endl;
         std::cout << "    " << argv[0]
-                  << " [create_prod|create|decode|verify|test] [-h|--help]"
+                  << " [create_prod|create|decode|verify|test] [-v2] [-h|--help]"
                   << std::endl;
     }
     return (int)sRc.mReason;

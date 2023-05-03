@@ -10,6 +10,7 @@ CeLogin::CeLoginRc createHsf(int argc, char** argv);
 CeLogin::CeLoginRc decodeHsf(int argc, char** argv);
 CeLogin::CeLoginRc verifyHsf(int argc, char** argv);
 CeLogin::CeLoginRc createProductionHsf(int argc, char** argv);
+CeLogin::CeLoginRc createProductionHsfV2(int argc, char** argv);
 }; // namespace cli
 
 #endif

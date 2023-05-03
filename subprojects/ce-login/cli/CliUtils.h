@@ -4,6 +4,8 @@
 #include <string>
 #include <vector>
 
+#include "CliTypes.h"
+
 #ifndef _CLIUTILS_H
 #define _CLIUTILS_H
 
@@ -24,6 +26,11 @@ bool writeBinaryFile(const std::string fileNameParm, const uint8_t* bufferParm,
 
 std::string getHexStringFromBinary(const std::vector<uint8_t>& binaryParm);
 
+std::string generateReplayId();
+
+bool generateEtcPasswdHash(const char* pwParm, const std::size_t pwLenParm,
+                           std::string& saltParm, std::string& hashParm);
+
 bool getIntFromJson(json_object* jsonObjectParm, const std::string keyParm,
                     int32_t& resultIntParm);
 
@@ -35,7 +42,7 @@ bool createSha512PasswordHash(const uint8_t* passwordParm,
                               std::vector<uint8_t>& outputHashParm);
 
 bool parseMachineFromString(const std::string& stringParm,
-                            CeLogin::Machine& machineParm);
+                            cli::Machine& machineParm);
 
 void printHelp(const char* cmdParm, const char* subCmdParm,
                const std::string& introParagraphParm,

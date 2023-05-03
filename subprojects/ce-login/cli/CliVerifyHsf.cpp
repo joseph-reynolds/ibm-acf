@@ -173,27 +173,24 @@ CeLogin::CeLoginRc cli::verifyHsf(int argc, char** argv)
             if (readBinaryFile(sArgs.mPublicKeyFileName, sPublicKey))
             {
                 std::time_t sTime = std::time(NULL);
-                CeLogin::ServiceAuthority sAuth = CeLogin::ServiceAuth_None;
-                uint64_t sExpiration = 0;
+		CeLogin::AcfUserFields sUserFields;
 
-                if (!sArgs.mPassword.empty())
-                {
-                    // Perform full authorization validation
-                    sRc = CeLogin::getServiceAuthorityV1(
-                        sHsf.data(), sHsf.size(), sArgs.mPassword.data(),
-                        sArgs.mPassword.size(), sTime, sPublicKey.data(),
-                        sPublicKey.size(), sArgs.mSerialNumber.data(),
-                        sArgs.mSerialNumber.size(), sAuth, sExpiration);
-                }
-                else
-                {
-                    // Verify ACF integrity, skip password validation
-                    sRc = CeLogin::checkServiceAuthorityAcfIntegrityV1(
-                        sHsf.data(), sHsf.size(), sTime, sPublicKey.data(),
-                        sPublicKey.size(), sArgs.mSerialNumber.data(),
-                        sArgs.mSerialNumber.size(), sAuth, sExpiration);
-                }
-
+#ifndef CELOGIN_POWERVM_TARGET
+		sRc = CeLogin::checkAuthorizationAndGetAcfUserFieldsV2(
+			sHsf.data(), sHsf.size(),
+			sArgs.mPassword.data(), sArgs.mPassword.size(),
+			sTime, sPublicKey.data(), sPublicKey.size(),
+			sArgs.mSerialNumber.data(), sArgs.mSerialNumber.size(),
+    			0, sUserFields);
+#else
+	        uint64_t sReplayId = 0;
+                sRc = CeLogin::checkAuthorizationAndGetAcfUserFieldsV2ForPowerVM(
+			sHsf.data(), sHsf.size(),
+			sArgs.mPassword.data(), sArgs.mPassword.size(),
+			sTime, sPublicKey.data(), sPublicKey.size(),
+			sArgs.mSerialNumber.data(), sArgs.mSerialNumber.size(),
+    			0, sReplayId, sUserFields);
+#endif
                 if (CeLoginRc::Success == sRc)
                 {
                     if (sArgs.mPassword.empty())
@@ -217,35 +214,44 @@ CeLogin::CeLoginRc cli::verifyHsf(int argc, char** argv)
                               << std::endl;
                     std::cout << "Error: " << sRc << std::endl;
                 }
-                switch (sAuth)
-                {
-                    case CeLogin::ServiceAuth_None:
+
+		if(sUserFields.mType == AcfType_AdminReset)
+		{
+                    std::cout << "Type: AdminReset" << std::endl;
+                    std::cout << "Hash: " << sUserFields.mTypeSpecificFields.mAdminResetFields.mAdminAuthCode << std::endl;
+		}
+		else if(sUserFields.mType == AcfType_Service)
+		{
+                    switch (sUserFields.mTypeSpecificFields.mServiceFields.mAuth)
                     {
-                        std::cout << "Authorization: None" << std::endl;
-                        break;
+                        case CeLogin::ServiceAuth_None:
+                        {
+                            std::cout << "Authorization: None" << std::endl;
+                            break;
+                        }
+                        case CeLogin::ServiceAuth_User:
+                        {
+                            std::cout << "Authorization: User" << std::endl;
+                            break;
+                        }
+                        case CeLogin::ServiceAuth_CE:
+                        {
+                            std::cout << "Authorization: CE" << std::endl;
+                            break;
+                        }
+                        case CeLogin::ServiceAuth_Dev:
+                        {
+                            std::cout << "Authorization: Dev" << std::endl;
+                            break;
+                        }
+                        default:
+                        {
+                            std::cout << "Authorization: Unknown" << std::endl;
+                            break;
+                        }
                     }
-                    case CeLogin::ServiceAuth_User:
-                    {
-                        std::cout << "Authorization: User" << std::endl;
-                        break;
-                    }
-                    case CeLogin::ServiceAuth_CE:
-                    {
-                        std::cout << "Authorization: CE" << std::endl;
-                        break;
-                    }
-                    case CeLogin::ServiceAuth_Dev:
-                    {
-                        std::cout << "Authorization: Dev" << std::endl;
-                        break;
-                    }
-                    default:
-                    {
-                        std::cout << "Authorization: Unknown" << std::endl;
-                        break;
-                    }
-                }
-                std::cout << "Expiration (UNIX): " << sExpiration << std::endl;
+		}
+                std::cout << "Expiration (UNIX): " << sUserFields.mExpirationTime << std::endl;
             }
             else
             {

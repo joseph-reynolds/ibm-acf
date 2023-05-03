@@ -548,7 +548,7 @@ CeLoginRc CeLogin::checkAuthorizationAndGetAcfUserFieldsV2ForPowerVM(
         accessControlFileParm, accessControlFileLengthParm, passwordParm,
         passwordLengthParm, timeSinceUnixEpochInSecondsParm,
         publicKeyParm, publicKeyLengthParm, serialNumberParm,
-        serialNumberLengthParm, currentReplayIdParm, sOutputReplayId,
+        serialNumberLengthParm, sHasReplayId, sAcfReplayId,
         userFieldsParm);
 
     // Verify Replay ID
