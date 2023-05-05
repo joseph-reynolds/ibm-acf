@@ -63,6 +63,7 @@ struct CeLoginRc
         UnsupportedAcfType = 0x09,
         InvalidReplayId = 0x0A,
         ReplayIdPersistenceFailure = 0x0B,
+        PowerVMRequestedReplayFailure = 0x0C,
 
 
         CreateHsf_PasswordHashFailure = 0x13,
@@ -350,7 +351,7 @@ CeLoginRc checkAuthorizationAndGetAcfUserFieldsV2ForPowerVM(
     const uint8_t* publicKeyParm, const uint64_t publicKeyLengthParm,
     const char* serialNumberParm, const uint64_t serialNumberLengthParm,
     const uint64_t currentReplayIdParm, uint64_t& updatedReplayIdParm,
-    AcfUserFields& userFieldsParm);
+    const bool failValidationIfReplayIdPresentParm, AcfUserFields& userFieldsParm);
 
 #endif /* CELOGIN_POWERVM_TARGET */
 

@@ -184,12 +184,13 @@ CeLogin::CeLoginRc cli::verifyHsf(int argc, char** argv)
     			0, sUserFields);
 #else
 	        uint64_t sReplayId = 0;
+                const bool sFailIfReplayIdPresent = false;
                 sRc = CeLogin::checkAuthorizationAndGetAcfUserFieldsV2ForPowerVM(
 			sHsf.data(), sHsf.size(),
 			sArgs.mPassword.data(), sArgs.mPassword.size(),
 			sTime, sPublicKey.data(), sPublicKey.size(),
 			sArgs.mSerialNumber.data(), sArgs.mSerialNumber.size(),
-    			0, sReplayId, sUserFields);
+    			0, sReplayId, sFailIfReplayIdPresent, sUserFields);
 #endif
                 if (CeLoginRc::Success == sRc)
                 {

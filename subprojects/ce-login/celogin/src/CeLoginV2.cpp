@@ -539,7 +539,7 @@ CeLoginRc CeLogin::checkAuthorizationAndGetAcfUserFieldsV2ForPowerVM(
     const uint8_t* publicKeyParm, const uint64_t publicKeyLengthParm,
     const char* serialNumberParm, const uint64_t serialNumberLengthParm,
     const uint64_t currentReplayIdParm, uint64_t& updatedReplayIdParm,
-    AcfUserFields& userFieldsParm)
+    const bool failValidationIfReplayIdPresentParm, AcfUserFields& userFieldsParm)
 {
     bool sHasReplayId = false;
     uint64_t sAcfReplayId = 0;
@@ -554,10 +554,17 @@ CeLoginRc CeLogin::checkAuthorizationAndGetAcfUserFieldsV2ForPowerVM(
     // Verify Replay ID
     if(CeLoginRc::Success == sRc)
     {
-        sRc = doFullReplayValidation(userFieldsParm.mType,
-                                     sHasReplayId,
-                                     currentReplayIdParm,
-                                     sAcfReplayId, updatedReplayIdParm);
+        if(failValidationIfReplayIdPresentParm && sHasReplayId)
+        {
+            sRc = CeLoginRc::PowerVMRequestedReplayFailure;
+        }
+        else
+        {
+            sRc = doFullReplayValidation(userFieldsParm.mType,
+                                         sHasReplayId,
+                                         currentReplayIdParm,
+                                         sAcfReplayId, updatedReplayIdParm);
+        }
     }
 
     return sRc;
