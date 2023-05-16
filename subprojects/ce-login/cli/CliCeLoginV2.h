@@ -1,15 +1,17 @@
 
 #include <CliTypes.h>
 #include <CeLogin.h>
+#include <CliCeLoginV1.h>
 
 #include <string>
 #include <vector>
 
-#ifndef _CELOGINV1_H
-#define _CELOGINV1_H
+#ifndef _CELOGINV2_H
+#define _CELOGINV2_H
 
 namespace CeLogin
 {
+    /*
 struct DecodedMachine
 {
     std::string mSerialNumber;
@@ -21,23 +23,16 @@ enum PasswordHashAlgorithm
     PasswordHash_Production,
     PasswordHash_SHA512,
 };
+*/
 
-struct CeLoginCreateHsfArgsV1
+struct CeLoginCreateHsfArgsV2
 {
-    std::string mSourceFileName;
-    std::vector<cli::Machine> mMachines;
-    std::string mExpirationDate;
-    std::string mRequestId;
-    const char* mPasswordPtr;
-    std::size_t mPasswordLength;
-    PasswordHashAlgorithm mPasswordHashAlgorithm;
-    std::vector<uint8_t> mPrivateKey;
-    std::size_t mSaltLength;
-    std::size_t mHashedAuthCodeLength;
-    std::size_t mIterations;
+    CeLoginCreateHsfArgsV1  mV1Args;
+    bool                    mNoReplayId;
+    std::string             mType;
 };
 
-struct CeLoginDecryptedHsfArgsV1
+struct CeLoginDecryptedHsfArgsV2
 {
     std::string mProcessingType;
     std::string mSourceFileName;
@@ -51,32 +46,28 @@ struct CeLoginDecryptedHsfArgsV1
     int mIterations;
 };
 
-CeLoginRc createCeLoginAcfV1(const CeLoginCreateHsfArgsV1& argsParm,
+CeLoginRc createCeLoginAcfV2(const CeLoginCreateHsfArgsV2& argsParm,
                              std::vector<uint8_t>& generatedAcfParm);
 
 CeLoginRc
-    createCeLoginAcfV1Payload(const CeLoginCreateHsfArgsV1& argsParm,
+    createCeLoginAcfV2Payload(const CeLoginCreateHsfArgsV2& argsParm,
                               std::string& generatedAcfParm,
                               std::vector<uint8_t>& generatedPayloadHashParm);
 
 CeLoginRc
-    createCeLoginAcfV1Signature(const CeLoginCreateHsfArgsV1& argsParm,
+    createCeLoginAcfV2Signature(const CeLoginCreateHsfArgsV2& argsParm,
                                 const std::vector<uint8_t>& jsonDigestParm,
                                 std::vector<uint8_t>& generatedSignatureParm);
 
-CeLoginRc createCeLoginAcfV1Asn1(const CeLoginCreateHsfArgsV1& argsParm,
+CeLoginRc createCeLoginAcfV2Asn1(const CeLoginCreateHsfArgsV2& argsParm,
                                  const std::string& jsonParm,
                                  const std::vector<uint8_t>& signatureParm,
                                  std::vector<uint8_t>& generatedAcfParm);
 
 CeLoginRc
-    decodeAndVerifyCeLoginHsfV1(const std::vector<uint8_t>& hsfParm,
+    decodeAndVerifyCeLoginHsfV2(const std::vector<uint8_t>& hsfParm,
                                 const std::vector<uint8_t>& publicKeyParm,
-                                CeLoginDecryptedHsfArgsV1& decodedHsfParm);
-
-CeLoginRc generateRandomPassword(char* dstParm, const uint64_t dstSizeParm);
-
-CeLogin::CeLoginRc getLocalRequestId(std::string& dstParm);
+                                CeLoginDecryptedHsfArgsV2& decodedHsfParm);
 
 }; // namespace CeLogin
 

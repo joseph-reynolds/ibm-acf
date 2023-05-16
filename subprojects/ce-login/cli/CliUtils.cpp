@@ -9,6 +9,8 @@
 #include <string.h>
 
 #include <algorithm>
+#include <cstdio>
+#include <ctime>
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -92,6 +94,54 @@ std::string cli::getHexStringFromBinary(const std::vector<uint8_t>& binaryParm)
     return ss.str();
 }
 
+std::string cli::generateReplayId()
+{
+    const std::time_t sUnixTime = std::time(nullptr);
+    const uint64_t sReplayId = static_cast<uint64_t>(sUnixTime);
+
+    return std::to_string(sReplayId);
+}
+
+bool cli::generateEtcPasswdHash(const char* pwParm, const std::size_t pwLenParm,
+                                std::string& saltParm, std::string& hashParm)
+{
+    bool sSuccess = false;
+    std::string sStdOut;
+    std::stringstream sCmd;
+
+    // -6 corresponds to SHA512
+    sCmd << "openssl passwd -6"
+         << " -salt " << saltParm
+         << " " << pwParm;
+
+    FILE* sPipe = popen(sCmd.str().c_str(), "r");
+    if(nullptr != sPipe)
+    {
+        const std::size_t sReadBufferSize = 1024;
+        char sReadBuffer[sReadBufferSize];
+
+        while(!feof(sPipe))
+        {
+            if(nullptr != fgets(sReadBuffer, sReadBufferSize, sPipe))
+            {
+                sStdOut += sReadBuffer;
+            }
+        }
+
+        int sRc = pclose(sPipe);
+        sSuccess = (EXIT_SUCCESS == sRc);
+    }
+
+    if(sSuccess)
+    {
+        sStdOut.erase(std::remove(sStdOut.begin(), sStdOut.end(), '\n'),
+                      sStdOut.cend());
+        hashParm = sStdOut;
+    }
+
+    return sSuccess;
+}
+
 bool cli::getIntFromJson(json_object* jsonObjectParm, const std::string keyParm,
                          int32_t& resultIntParm)
 {
@@ -160,7 +210,7 @@ bool cli::createSha512PasswordHash(const uint8_t* passwordParm,
 }
 
 bool cli::parseMachineFromString(const std::string& stringParm,
-                                 CeLogin::Machine& machineParm)
+                                 cli::Machine& machineParm)
 {
     using namespace std;
     bool sIsSuccess = false;
@@ -197,7 +247,7 @@ bool cli::parseMachineFromString(const std::string& stringParm,
                 if (!sSerialStr.empty())
                 {
                     machineParm.mAuth = sAuth;
-                    machineParm.mProc = CeLogin::P10;
+                    machineParm.mProc = cli::P10;
                     machineParm.mSerialNumber = sSerialStr;
                     sIsSuccess = true;
                 }

@@ -22,7 +22,7 @@ using namespace std;
 
 struct CreateArguments
 {
-    vector<CeLogin::Machine> mMachines;
+    vector<cli::Machine> mMachines;
     string mPassword;
     string mExpirationDate;
     string mPrivateKeyFile;
@@ -109,7 +109,7 @@ void createParseArgs(int argc, char** argv, struct CreateArguments& args)
             // Example: P10,Dev,12345
             string sArg = optarg;
             // Count the number of delimiters, should be 2
-            CeLogin::Machine sMachine;
+            cli::Machine sMachine;
             if (cli::parseMachineFromString(sArg, sMachine))
             {
                 args.mMachines.push_back(sMachine);

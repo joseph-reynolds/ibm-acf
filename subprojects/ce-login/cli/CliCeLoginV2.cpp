@@ -1,4 +1,4 @@
-#include "CliCeLoginV1.h"
+#include "CliCeLoginV2.h"
 #include "CliTypes.h"
 
 #include "../celogin/src/CeLoginAsnV1.h"
@@ -27,30 +27,38 @@
 #include <vector>
 
 using CeLogin::CeLoginRc;
+using CeLogin::CeLoginCreateHsfArgsV1;
+using CeLogin::CeLoginCreateHsfArgsV2;
 
-CeLoginRc CeLogin::createCeLoginAcfV1Payload(
-    const CeLoginCreateHsfArgsV1& argsParm, std::string& generatedJsonParm,
+CeLoginRc CeLogin::createCeLoginAcfV2Payload(
+    const CeLoginCreateHsfArgsV2& argsParm, std::string& generatedJsonParm,
     std::vector<uint8_t>& generatedPayloadHashParm)
 {
     CeLoginRc sRc = CeLoginRc::Success;
+
+    const CeLoginCreateHsfArgsV2& sArgsV2 = argsParm;
+    const CeLoginCreateHsfArgsV1& sArgsV1 = argsParm.mV1Args;
+
     std::string sPasswordHashHexString;
     std::string sSaltHexString;
+    std::string sReplayId = cli::generateReplayId();
+    const bool sIsAdminReset = ("adminreset" == sArgsV2.mType);
 
-    std::vector<uint8_t> sHashedAuthCode(argsParm.mHashedAuthCodeLength);
-    std::vector<uint8_t> sSalt(argsParm.mSaltLength, 0);
+    std::vector<uint8_t> sHashedAuthCode(sArgsV1.mHashedAuthCodeLength);
+    std::vector<uint8_t> sSalt(sArgsV1.mSaltLength, 0);
 
-    uint64_t sIterations = argsParm.mIterations;
+    uint64_t sIterations = sArgsV1.mIterations;
 
-    if (argsParm.mMachines.empty() || !argsParm.mPasswordPtr ||
-        0 == argsParm.mPasswordLength || argsParm.mExpirationDate.empty() ||
-        argsParm.mRequestId.empty())
+    if (sArgsV1.mMachines.empty() || !sArgsV1.mPasswordPtr ||
+        0 == sArgsV1.mPasswordLength || sArgsV1.mExpirationDate.empty() ||
+        sArgsV1.mRequestId.empty() || sArgsV2.mType.empty())
     {
         sRc = CeLoginRc::Failure;
         std::cout << "ERROR line " << __LINE__ << std::endl;
     }
 
     if (CeLoginRc::Success == sRc &&
-        PasswordHash_Production == argsParm.mPasswordHashAlgorithm)
+        PasswordHash_Production == sArgsV1.mPasswordHashAlgorithm)
     {
         // Create a random salt
         int sOsslRc = RAND_bytes(sSalt.data(), sSalt.size());
@@ -63,18 +71,18 @@ CeLoginRc CeLogin::createCeLoginAcfV1Payload(
     // Hash password
     if (CeLoginRc::Success == sRc)
     {
-        if (PasswordHash_Production == argsParm.mPasswordHashAlgorithm)
+        if (PasswordHash_Production == sArgsV1.mPasswordHashAlgorithm)
         {
             sRc = CeLogin::createPasswordHash(
-                argsParm.mPasswordPtr, argsParm.mPasswordLength, sSalt.data(),
+                sArgsV1.mPasswordPtr, sArgsV1.mPasswordLength, sSalt.data(),
                 sSalt.size(), sIterations, sHashedAuthCode.data(),
                 sHashedAuthCode.size(), sHashedAuthCode.size());
         }
-        else if (PasswordHash_SHA512 == argsParm.mPasswordHashAlgorithm)
+        else if (PasswordHash_SHA512 == sArgsV1.mPasswordHashAlgorithm)
         {
             sIterations = 0;
             bool sSuccess = cli::createSha512PasswordHash(
-                (const uint8_t*)argsParm.mPasswordPtr, argsParm.mPasswordLength,
+                (const uint8_t*)sArgsV1.mPasswordPtr, sArgsV1.mPasswordLength,
                 sHashedAuthCode);
             if (!sSuccess)
             {
@@ -100,7 +108,7 @@ CeLoginRc CeLogin::createCeLoginAcfV1Payload(
     if (CeLoginRc::Success == sRc)
     {
         json_object* sJsonObj = json_object_new_object();
-        json_object* sVersion = json_object_new_int(CeLoginVersion1);
+        json_object* sVersion = json_object_new_int(CeLoginVersion2);
         json_object* sMachinesArray = json_object_new_array();
 
         json_object* sHashedPassword =
@@ -108,27 +116,30 @@ CeLoginRc CeLogin::createCeLoginAcfV1Payload(
         json_object* sSaltObj = json_object_new_string(sSaltHexString.c_str());
         json_object* sIterationsObj = json_object_new_int(sIterations);
         json_object* sExpirationDate =
-            json_object_new_string(argsParm.mExpirationDate.c_str());
+            json_object_new_string(sArgsV1.mExpirationDate.c_str());
         json_object* sRequestId =
-            json_object_new_string(argsParm.mRequestId.c_str());
+            json_object_new_string(sArgsV1.mRequestId.c_str());
+        json_object* sReplayIdJson = json_object_new_string(sReplayId.c_str());
+        json_object* sAdminAuthCodeJson = nullptr;
+        json_object* sAcfTypeJson = json_object_new_string(sArgsV2.mType.c_str());
 
         if (sJsonObj && sVersion && sMachinesArray && sHashedPassword &&
-            sExpirationDate && sRequestId)
+            sExpirationDate && sRequestId && sReplayIdJson && sAcfTypeJson)
         {
-            for (int sIdx = 0; sIdx < argsParm.mMachines.size(); sIdx++)
+            for (int sIdx = 0; sIdx < sArgsV1.mMachines.size(); sIdx++)
             {
                 json_object* sMachinesObj = json_object_new_object();
                 json_object* sSerialNumber = json_object_new_string(
-                    argsParm.mMachines[sIdx].mSerialNumber.c_str());
+                    sArgsV1.mMachines[sIdx].mSerialNumber.c_str());
                 std::string sFrameworkEcStr;
 
-                if (cli::P10 == argsParm.mMachines[sIdx].mProc)
+                if (cli::P10 == sArgsV1.mMachines[sIdx].mProc)
                 {
-                    if (ServiceAuth_Dev == argsParm.mMachines[sIdx].mAuth)
+                    if (ServiceAuth_Dev == sArgsV1.mMachines[sIdx].mAuth)
                     {
                         sFrameworkEcStr = FrameworkEc_P10_Dev;
                     }
-                    else if (ServiceAuth_CE == argsParm.mMachines[sIdx].mAuth)
+                    else if (ServiceAuth_CE == sArgsV1.mMachines[sIdx].mAuth)
                     {
                         sFrameworkEcStr = FrameworkEc_P10_Service;
                     }
@@ -159,15 +170,42 @@ CeLoginRc CeLogin::createCeLoginAcfV1Payload(
             }
 
             json_object_object_add(sJsonObj, JsonName_Version, sVersion);
+            json_object_object_add(sJsonObj, JsonName_Type, sAcfTypeJson);
             json_object_object_add(sJsonObj, JsonName_Machines, sMachinesArray);
-            json_object_object_add(sJsonObj, JsonName_HashedAuthCode,
-                                   sHashedPassword);
-            json_object_object_add(sJsonObj, JsonName_Salt, sSaltObj);
-            json_object_object_add(sJsonObj, JsonName_Iterations,
-                                   sIterationsObj);
-            json_object_object_add(sJsonObj, JsonName_Expiration,
-                                   sExpirationDate);
+
+            if(sIsAdminReset)
+            {
+                std::string sAdminAuthCode;
+                if(cli::generateEtcPasswdHash(sArgsV1.mPasswordPtr, sArgsV1.mPasswordLength,
+                                              sSaltHexString, sAdminAuthCode))
+                {
+                    std::vector<uint8_t> sAuthCodeBytes(sAdminAuthCode.begin(), sAdminAuthCode.end());
+                    std::string sHexEncodedAuthCode = cli::getHexStringFromBinary(sAuthCodeBytes);
+
+                    sAdminAuthCodeJson = json_object_new_string(sHexEncodedAuthCode.c_str());
+                    if(NULL != sAdminAuthCodeJson)
+                    {
+                        json_object_object_add(sJsonObj, JsonName_AdminAuthCode, sAdminAuthCodeJson);
+                    }
+                    else { sRc = CeLoginRc::Failure; }
+                }
+                else { sRc = CeLoginRc::Failure; }
+            }
+            else // service type
+            {
+                json_object_object_add(sJsonObj, JsonName_HashedAuthCode, sHashedPassword);
+                json_object_object_add(sJsonObj, JsonName_Salt, sSaltObj);
+                json_object_object_add(sJsonObj, JsonName_Iterations, sIterationsObj);
+            }
+
             json_object_object_add(sJsonObj, JsonName_RequestId, sRequestId);
+
+            if(!sArgsV2.mNoReplayId)
+            {
+                json_object_object_add(sJsonObj, JsonName_ReplayId, sReplayIdJson);
+            }
+
+            json_object_object_add(sJsonObj, JsonName_Expiration, sExpirationDate);
 
             // When the json object is free'd this string will also be free'd
             const char* sGeneratedJsonString =
@@ -220,6 +258,21 @@ CeLoginRc CeLogin::createCeLoginAcfV1Payload(
                 json_object_put(sRequestId);
                 sRequestId = NULL;
             }
+            if(sReplayIdJson)
+            {
+                json_object_put(sReplayIdJson);
+                sReplayIdJson = NULL;
+            }
+            if(sAdminAuthCodeJson)
+            {
+                json_object_put(sAdminAuthCodeJson);
+                sAdminAuthCodeJson = NULL;
+            }
+            if(sAcfTypeJson)
+            {
+                json_object_put(sAcfTypeJson);
+                sAcfTypeJson = NULL;
+            }
         }
 
         if (sJsonObj)
@@ -248,15 +301,19 @@ CeLoginRc CeLogin::createCeLoginAcfV1Payload(
     return sRc;
 }
 
-CeLogin::CeLoginRc CeLogin::createCeLoginAcfV1Signature(
-    const CeLoginCreateHsfArgsV1& argsParm,
+CeLogin::CeLoginRc CeLogin::createCeLoginAcfV2Signature(
+    const CeLoginCreateHsfArgsV2& argsParm,
     const std::vector<uint8_t>& jsonDigestParm,
     std::vector<uint8_t>& generatedSignatureParm)
 {
     CeLoginRc sRc = CeLoginRc::Success;
-    const uint8_t* sConstPrivateKey = argsParm.mPrivateKey.data();
+
+    const CeLoginCreateHsfArgsV2& sArgsV2 = argsParm;
+    const CeLoginCreateHsfArgsV1& sArgsV1 = argsParm.mV1Args;
+
+    const uint8_t* sConstPrivateKey = sArgsV1.mPrivateKey.data();
     RSA* sPrivateKey =
-        d2i_RSAPrivateKey(NULL, &sConstPrivateKey, argsParm.mPrivateKey.size());
+        d2i_RSAPrivateKey(NULL, &sConstPrivateKey, sArgsV1.mPrivateKey.size());
     // TODO: Verify size matches expected size
     if (sPrivateKey)
     {
@@ -277,8 +334,8 @@ CeLogin::CeLoginRc CeLogin::createCeLoginAcfV1Signature(
     }
     else
     {
-        std::cout << "Huh, that's odd V1... " << std::endl;
         sRc = CeLoginRc::Failure;
+        std::cout << "huh, that's odd" << std::endl;
     }
 
     if (sPrivateKey)
@@ -295,16 +352,18 @@ CeLogin::CeLoginRc CeLogin::createCeLoginAcfV1Signature(
 }
 
 CeLogin::CeLoginRc
-    CeLogin::createCeLoginAcfV1Asn1(const CeLoginCreateHsfArgsV1& argsParm,
+    CeLogin::createCeLoginAcfV2Asn1(const CeLoginCreateHsfArgsV2& argsParm,
                                     const std::string& jsonParm,
                                     const std::vector<uint8_t>& signatureParm,
                                     std::vector<uint8_t>& generatedAcfParm)
 {
     CeLoginRc sRc = CeLoginRc::Success;
 
+    const CeLoginCreateHsfArgsV2& sArgsV2 = argsParm;
+    const CeLoginCreateHsfArgsV1& sArgsV1 = argsParm.mV1Args;
     CELoginSequenceV1* sHsfStruct = NULL;
 
-    if (argsParm.mSourceFileName.empty() || jsonParm.empty() ||
+    if (sArgsV1.mSourceFileName.empty() || jsonParm.empty() ||
         signatureParm.empty())
     {
         sRc = CeLoginRc::Failure;
@@ -318,8 +377,8 @@ CeLogin::CeLoginRc
         ASN1_STRING_set(sHsfStruct->processingType, CeLogin::AcfProcessingType,
                         strlen(CeLogin::AcfProcessingType));
         ASN1_STRING_set(sHsfStruct->sourceFileName,
-                        argsParm.mSourceFileName.c_str(),
-                        argsParm.mSourceFileName.size());
+                        sArgsV1.mSourceFileName.c_str(),
+                        sArgsV1.mSourceFileName.size());
         ASN1_OCTET_STRING_set(sHsfStruct->sourceFileData,
                               (const uint8_t*)jsonParm.data(), jsonParm.size());
         sHsfStruct->algorithm->id = OBJ_nid2obj(CeLogin::CeLogin_Acf_NID);
@@ -355,35 +414,35 @@ CeLogin::CeLoginRc
 }
 
 CeLogin::CeLoginRc
-    CeLogin::createCeLoginAcfV1(const CeLoginCreateHsfArgsV1& argsParm,
+    CeLogin::createCeLoginAcfV2(const CeLoginCreateHsfArgsV2& argsParm,
                                 std::vector<uint8_t>& generatedAcfParm)
 {
     std::string sJsonString;
     std::vector<uint8_t> sJsonDigest;
     CeLoginRc sRc =
-        createCeLoginAcfV1Payload(argsParm, sJsonString, sJsonDigest);
+        createCeLoginAcfV2Payload(argsParm, sJsonString, sJsonDigest);
 
     std::vector<uint8_t> sJsonSignature;
 
     if (CeLoginRc::Success == sRc)
     {
         sRc =
-            createCeLoginAcfV1Signature(argsParm, sJsonDigest, sJsonSignature);
+            createCeLoginAcfV2Signature(argsParm, sJsonDigest, sJsonSignature);
     }
 
     if (CeLoginRc::Success == sRc)
     {
-        sRc = createCeLoginAcfV1Asn1(argsParm, sJsonString, sJsonSignature,
+        sRc = createCeLoginAcfV2Asn1(argsParm, sJsonString, sJsonSignature,
                                      generatedAcfParm);
     }
 
     return sRc;
 }
 
-CeLogin::CeLoginRc CeLogin::decodeAndVerifyCeLoginHsfV1(
+CeLogin::CeLoginRc CeLogin::decodeAndVerifyCeLoginHsfV2(
     const std::vector<uint8_t>& hsfParm,
     const std::vector<uint8_t>& publicKeyParm,
-    CeLoginDecryptedHsfArgsV1& decodedHsfParm)
+    CeLoginDecryptedHsfArgsV2& decodedHsfParm)
 {
     CeLoginRc sRc = CeLoginRc::Success;
 
@@ -459,12 +518,13 @@ CeLogin::CeLoginRc CeLogin::decodeAndVerifyCeLoginHsfV1(
         if (CeLoginRc::Success == sRc &&
             cli::getIntFromJson(sJson, CeLogin::JsonName_Version, sVersion))
         {
-            if (CeLoginVersion1 != sVersion)
+            if (CeLoginVersion2 != sVersion)
             {
                 sRc = CeLoginRc::DecodeHsf_VersionMismatch;
             }
         }
 
+        // JSW TODO This won't work without some modification to handle types
         if (CeLoginRc::Success == sRc)
         {
             json_object* sMachinesArray = NULL;
@@ -559,55 +619,4 @@ CeLogin::CeLoginRc CeLogin::decodeAndVerifyCeLoginHsfV1(
         CELoginSequenceV1_free(sDecodedAsn);
     }
     return sRc;
-}
-
-CeLogin::CeLoginRc
-    CeLogin::generateRandomPassword(char* dstParm,
-                                    const uint64_t requestPasswordSize)
-{
-    // Generate an array of the "usable" characters for ACF passwords. A random
-    // password will be generated by randomly selecting characters in this list.
-    // clang-format off
-    const char sValidCharacters[] = {
-        'A','B','C','D','E','F','G','H',/*'I',*/'J','K',  'L',  'M','N',/*'O',*/'P','Q','R','S','T','U','V','W','X','Y','Z',
-        'a','b','c','d','e','f','g','h',  'i',  'j','k',/*'l',*/'m','n',  'o',  'p','q','r','s','t','u','v','w','x','y','z',
-        '0','1','2','3','4','5','6','7','8','9'
-    };
-    // clang-format on
-
-    for (uint64_t sIdx = 0; sIdx < requestPasswordSize; sIdx++)
-    {
-        // Reuse the memory to store the temporary value
-        uint8_t& sRandomByte = ((uint8_t*)dstParm)[sIdx];
-        do
-        {
-            int rc = RAND_priv_bytes(&sRandomByte, sizeof(sRandomByte));
-            if (1 != rc)
-            {
-                return CeLoginRc::Failure;
-            }
-            // To simplify the code, reject a random number that is an
-            // out-of-bounds index.
-        } while (sRandomByte >= sizeof(sValidCharacters));
-
-        dstParm[sIdx] = sValidCharacters[sRandomByte];
-    }
-
-    return CeLoginRc::Success;
-}
-
-CeLogin::CeLoginRc CeLogin::getLocalRequestId(std::string& dstParm)
-{
-    char hostname[_POSIX_HOST_NAME_MAX];
-
-    char username[_POSIX_LOGIN_NAME_MAX];
-    gethostname(hostname, sizeof(hostname));
-    getlogin_r(username, sizeof(username));
-    std::time_t sTime =
-        std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
-
-    dstParm = std::string(username) + "@" + std::string(hostname) + "@" +
-              std::ctime(&sTime);
-
-    return CeLoginRc::Success;
 }

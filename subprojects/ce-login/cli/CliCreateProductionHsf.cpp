@@ -1,6 +1,7 @@
 #include "CeLoginCli.h"
 #include "CliCeLoginV1.h"
 #include "CliUtils.h"
+#include "CliTypes.h"
 
 #include <CeLogin.h>
 #include <getopt.h>
@@ -29,7 +30,7 @@ enum ProdConstants
 
 struct Arguments
 {
-    vector<CeLogin::Machine> mMachines;
+    vector<cli::Machine> mMachines;
     string mExpirationDate;
     string mPasswordFile;
     string mComment;
@@ -133,7 +134,7 @@ void parseArgs(int argc, char** argv, struct Arguments& args)
             // Example: P10,Dev,12345
             string sArg = optarg;
             // Count the number of delimiters, should be 2
-            CeLogin::Machine sMachine;
+            cli::Machine sMachine;
             if (cli::parseMachineFromString(sArg, sMachine))
             {
                 args.mMachines.push_back(sMachine);
