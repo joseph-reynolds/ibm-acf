@@ -269,8 +269,10 @@ namespace CreateProductionV2
             {
                 if(sNoReplayId)
                 {
+#ifndef TOLERATE_ADMIN_RESET_REPLAY
                     sIsValidArgs = false;
                     cerr << "Admin reset requires replay ID" << endl;
+#endif
                 }
             }
         }
