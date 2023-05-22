@@ -859,6 +859,10 @@ UnitTestResult ut_acf_auth_v2()
             0, sFields);
 
     DO_TEST(sResult, CeLoginRc::Success == sRc, sRc);
+    DO_TEST(sResult, sFields.mVersion == CeLoginVersion2, sFields.mVersion);
+    DO_TEST(sResult, sFields.mType == AcfType_AdminReset, sFields.mType);
+    DO_TEST(sResult, sFields.mTypeSpecificFields.mAdminResetFields.mAdminAuthCodeLength > 0,
+                     sFields.mTypeSpecificFields.mAdminResetFields.mAdminAuthCodeLength);
 
 #endif
     return sResult;
@@ -1221,7 +1225,11 @@ UnitTestResult ut_powervm()
               sHsfArgs.mMachines.front().mSerialNumber.length(),
               sExistingReplayId, sReplayId, sFailIfReplayIdPresent, sFields);
 
-    DO_TEST(sResult, CeLoginRc::Success != sRc, sRc);
+    DO_TEST(sResult, CeLoginRc::Success == sRc, sRc);
+    DO_TEST(sResult, sFields.mVersion == CeLoginVersion2, sFields.mVersion);
+    DO_TEST(sResult, sFields.mType == AcfType_AdminReset, sFields.mType);
+    DO_TEST(sResult, sFields.mTypeSpecificFields.mAdminResetFields.mAdminAuthCodeLength > 0,
+                     sFields.mTypeSpecificFields.mAdminResetFields.mAdminAuthCodeLength);
 
     //
     // Admin Reset ACF (replay)
