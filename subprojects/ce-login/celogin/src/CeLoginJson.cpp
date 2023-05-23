@@ -264,16 +264,8 @@ CeLoginRc CeLogin::decodeJson(const char* jsonStringParm,
     // Parse AdminReset ACF type
     if (CeLoginRc::Success == sRc && AcfType_AdminReset == sAcfType)
     {
-        if (decodedJsonParm.mReplayInfo.mReplayIdPresent)
-        {
-            sRc =
-                ParseAdminResetFields(sJsmnState, sVersion, serialNumberParm,
-                                      serialNumberLengthParm, decodedJsonParm);
-        }
-        else
-        {
-            sRc = CeLoginRc::MissingReplayId;
-        }
+        sRc = ParseAdminResetFields(sJsmnState, sVersion, serialNumberParm,
+                                    serialNumberLengthParm, decodedJsonParm);
     }
 
     // Parse Service ACF type

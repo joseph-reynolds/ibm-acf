@@ -463,13 +463,8 @@ static CeLoginRc checkAuthorizationAndGetAcfUserFieldsV2Internal(
 
         if (CeLogin::AcfType_AdminReset == sJsonData->mType)
         {
-            if (!sJsonData->mReplayInfo.mReplayIdPresent)
-            {
-                sRc = CeLoginRc::MissingReplayId;
-            }
-            else if (sJsonData->mAdminAuthCodeLength == 0 ||
-                     sJsonData->mAdminAuthCodeLength >=
-                         CeLogin::AdminAuthCodeMaxLen)
+            if (sJsonData->mAdminAuthCodeLength == 0 ||
+                sJsonData->mAdminAuthCodeLength >= CeLogin::AdminAuthCodeMaxLen)
             {
                 sRc = CeLoginRc::Failure;
             }
