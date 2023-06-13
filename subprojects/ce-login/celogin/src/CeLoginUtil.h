@@ -13,13 +13,6 @@ namespace CeLogin
 extern const char* FrameworkEc_P10_Dev;
 extern const char* FrameworkEc_P10_Service;
 
-struct CeLogin_Date
-{
-    uint16_t mYear;
-    uint8_t mMonth;
-    uint8_t mDay;
-};
-
 enum
 {
     // The ACF, Digest, and DigestLength should use the same algorithms

@@ -1000,6 +1000,7 @@ UnitTestResult ut_acf_metadata_v2()
     uint64_t sExp;
     AcfVersion sVersion;
     bool sHasReplayId;
+    CeLogin_Date sDate;
 
     //
     // Admin reset ACF
@@ -1015,7 +1016,7 @@ UnitTestResult ut_acf_metadata_v2()
               key1_pub_der, key1_pub_der_len,
               sHsfArgs.mMachines.front().mSerialNumber.c_str(),
               sHsfArgs.mMachines.front().mSerialNumber.length(),
-              sType, sExp, sVersion, sHasReplayId);
+              sType, sExp, sDate, sVersion, sHasReplayId);
 
     DO_TEST(sResult, CeLoginRc::Success == sRc, sRc);
     DO_TEST(sResult, sType == AcfType_AdminReset, sType);
@@ -1037,7 +1038,7 @@ UnitTestResult ut_acf_metadata_v2()
               key1_pub_der, key1_pub_der_len,
               sHsfArgs.mMachines.front().mSerialNumber.c_str(),
               sHsfArgs.mMachines.front().mSerialNumber.length(),
-              sType, sExp, sVersion, sHasReplayId);
+              sType, sExp, sDate, sVersion, sHasReplayId);
 
     DO_TEST(sResult, CeLoginRc::Success == sRc, sRc);
     DO_TEST(sResult, sType == AcfType_Service, sType);
@@ -1059,7 +1060,7 @@ UnitTestResult ut_acf_metadata_v2()
               key1_pub_der, key1_pub_der_len,
               sHsfArgs.mMachines.front().mSerialNumber.c_str(),
               sHsfArgs.mMachines.front().mSerialNumber.length(),
-              sType, sExp, sVersion, sHasReplayId);
+              sType, sExp, sDate, sVersion, sHasReplayId);
 
     DO_TEST(sResult, CeLoginRc::Success == sRc, sRc);
     DO_TEST(sResult, sType == AcfType_Service, sType);
@@ -1077,7 +1078,7 @@ UnitTestResult ut_acf_metadata_v2()
               key1_pub_der, key1_pub_der_len,
               sHsfArgs.mMachines.front().mSerialNumber.c_str(),
               sHsfArgs.mMachines.front().mSerialNumber.length(),
-              sType, sExp, sVersion, sHasReplayId);
+              sType, sExp, sDate, sVersion, sHasReplayId);
 
     DO_TEST(sResult, CeLoginRc::Success == sRc, sRc);
     DO_TEST(sResult, sType == AcfType_Service, sType);
