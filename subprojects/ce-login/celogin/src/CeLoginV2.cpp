@@ -140,6 +140,7 @@ CeLoginRc CeLogin::extractACFMetadataV2(
     const uint8_t* publicKeyParm, const uint64_t publicKeyLengthParm,
     const char* serialNumberParm, const uint64_t serialNumberLengthParm,
     AcfType& acfTypeParm, uint64_t& expirationTimeParm,
+    CeLogin_Date& expirationDateParm,
     AcfVersion& versionParm, bool& hasReplayIdParm)
 {
     CeLoginRc sRc = CeLoginRc::Success;
@@ -216,6 +217,7 @@ CeLoginRc CeLogin::extractACFMetadataV2(
     {
         acfTypeParm = sJsonData->mType;
         expirationTimeParm = sExpirationTime;
+        expirationDateParm = sJsonData->mExpirationDate;
         versionParm = sJsonData->mVersion;
         hasReplayIdParm = sJsonData->mReplayInfo.mReplayIdPresent;
     }

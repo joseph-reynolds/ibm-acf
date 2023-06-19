@@ -74,7 +74,7 @@ if [ -e $MYPATH/build/celogin_cli ]; then
     CESCRIPT=$MYPATH/build/celogin_cli
 fi
 
-$CESCRIPT create -m "${ARCH},dev,${SERIAL}" -p "${PASSWD}" -e 2040-01-01 -k ${SIGNINGKEY} -o ${ACF} ${ITERATIONS}
+$CESCRIPT create -m "${ARCH},dev,${SERIAL}" -p "${PASSWD}" -e 2035-01-01 -k ${SIGNINGKEY} -o ${ACF} ${ITERATIONS}
 if [ $? != 0 ]; then
     echo "**** ERROR : Unable to create the ACF"
     exit 1

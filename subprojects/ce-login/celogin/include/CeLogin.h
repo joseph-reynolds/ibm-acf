@@ -38,6 +38,13 @@ enum AcfType
     AcfType_AdminReset = 2
 };
 
+struct CeLogin_Date
+{
+    uint16_t mYear;
+    uint8_t mMonth;
+    uint8_t mDay;
+};
+
 struct CeLoginRc
 {
     enum Component
@@ -244,6 +251,7 @@ CeLoginRc checkServiceAuthorityAcfIntegrityV1(
  *  @param serialNumberLengthParm the length of the provided serial number
  *  @param acfTypeParm the AcfType parsed from the provided file (e.g. service or admin reset)
  *  @param expirationTimeParm the time at which this ACF expires
+ *  @param expirationDateParm the formatted date at which this ACF expires
  *  @param versionParm the version field in the provided ACF
  *  @param hasReplayIdParm returns true if a replay ID is present in the ACF
  *
@@ -258,6 +266,7 @@ CeLoginRc extractACFMetadataV2(
     const uint8_t* publicKeyParm, const uint64_t publicKeyLengthParm,
     const char* serialNumberParm, const uint64_t serialNumberLengthParm,
     AcfType& acfTypeParm, uint64_t& expirationTimeParm,
+    CeLogin_Date& expirationDateParm,
     AcfVersion& versionParm, bool& hasReplayIdParm);
 
 #ifndef CELOGIN_POWERVM_TARGET
