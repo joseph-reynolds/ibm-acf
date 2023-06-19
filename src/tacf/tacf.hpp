@@ -254,9 +254,7 @@ class Tacf : TargetedAcf
             // If action successful.
             if (CeLogin::CeLoginRc::Success == authRc)
             {
-                // Get expiration date
-
-                // And return success.
+                // Return success.
                 return tacfSuccess;
             }
         }
