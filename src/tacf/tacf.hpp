@@ -363,7 +363,7 @@ class Tacf : TargetedAcf
         if (TacfDbus().retrieveSerialNumber(serial))
         {
             log("acfv2 retrieve serial error");
-            return tacfSystemError;
+            serial = serialNumberUnset;
         }
         else
         {
