@@ -21,6 +21,8 @@ constexpr unsigned int TargetedAcf::acfTypeAdminReset =
 constexpr unsigned int TargetedAcf::acfTypeService =
     CeLogin::AcfType::AcfType_Service;
 
+constexpr auto invalidReplayId = TacfCelogin::invalidReplayId;
+
 const auto pubkeysProd = std::to_array<std::string>(
     {"/srv/ibm-acf/ibmacf-prod.key", "/srv/ibm-acf/ibmacf-prod-backup.key",
      "/srv/ibm-acf/ibmacf-prod-backup2.key"});
@@ -275,7 +277,7 @@ class Tacf : TargetedAcf
         if (TacfDbus().readReplayId(id))
         {
             log("acfv2 retrieve replay error");
-            return tacfSystemError;
+            id = invalidReplayId;
         }
 
         return tacfSuccess;

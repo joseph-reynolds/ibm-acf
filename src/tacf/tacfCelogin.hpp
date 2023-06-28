@@ -80,11 +80,25 @@ class TacfCelogin
     {
         uint64_t replayIdNew;
         uint64_t timestamp = getTimestamp();
+        bool replayIdValid = true;
+
+        // If replay ID is invalid set to genesis
+        if (invalidReplayId == replayId)
+        {
+            replayId      = 0;
+            replayIdValid = false;
+        }
 
         // Verify signature and get ACF type.
         CeLogin::CeLoginRc authRc = CeLogin::verifyACFForBMCUploadV2(
             acf, acfSize, timestamp, pubkey, pubkeySize, serial.data(),
             serial.size(), replayId, replayIdNew, type, expires);
+
+        // Restore invalid replay ID
+        if (!replayIdValid)
+        {
+            replayId = invalidReplayId;
+        }
 
         // Return celogin specific error code.
         if (CeLogin::CeLoginRc::Success != authRc)
@@ -117,9 +131,6 @@ class TacfCelogin
                                        .mAdminResetFields.mAdminAuthCodeLength);
         }
 
-        // Update the replay id.
-        replayId = replayIdNew;
-
         // Get the ACF expiration details.
         CeLogin::AcfType ceLoginType = CeLogin::AcfType::AcfType_Invalid;
         CeLogin::AcfVersion version  = CeLogin::CeLoginInvalidVersion;
@@ -134,6 +145,22 @@ class TacfCelogin
         {
             // Get expiration date as string.
             expireDate = getDate(ceLoginDate);
+
+            // If replay ID required
+            if (hasReplay)
+            {
+                // And replay ID is valid
+                if (replayIdValid)
+                {
+                    // Update the replay ID.
+                    replayId = replayIdNew;
+                }
+                else
+                {
+                    // Valid replay ID was required.
+                    return 1;
+                }
+            }
         }
 
         // And return success.
@@ -183,6 +210,8 @@ class TacfCelogin
         // And return success.
         return 0;
     }
+
+    const static uint64_t invalidReplayId = 0xffffffffffffffff;
 
   private:
     /** @brief A helper function to get a current timestamp */
