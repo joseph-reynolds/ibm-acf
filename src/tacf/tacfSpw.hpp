@@ -48,7 +48,8 @@ class TacfSpw
      * Update the admin user shadow password and expire the password.
      * @brief Reset the admin user account password.
      *
-     * @param adminSpw  The value to set as the admin user shadow password.
+     * @param spw  The value to set as the admin user shadow password.
+     * @param name The name of the admin user.
      *
      * @return A non-zero error value or zero on success.
      */
@@ -63,14 +64,21 @@ class TacfSpw
         spwd* spwDbEntry;
         spwd spwEntry;
 
+        // Read shadow entries from file instead of database.
+        FILE* spwFileRead = fopen(spwFilePath, "r");
+        if (nullptr == spwFileRead)
+        {
+            return 1;
+        }
+
         // Read each shadow password entry.
-        while ((spwDbEntry = getspent()))
+        while ((spwDbEntry = fgetspent(spwFileRead)))
         {
             // If the admin user name is found, save the details and skip.
             if (name == spwDbEntry->sp_namp)
             {
                 spwEntry           = *spwDbEntry;
-                spwEntry.sp_namp   = (char*)name.c_str(); // not needed
+                spwEntry.sp_namp   = (char*)name.c_str();
                 spwEntry.sp_pwdp   = (char*)spw.c_str();
                 spwEntry.sp_lstchg = 0;
                 continue;
@@ -80,6 +88,9 @@ class TacfSpw
         }
         // Write admin user entry, will discard if empty.
         putspent(&spwEntry, spwFile);
+
+        // Close the read file handle.
+        fclose(spwFileRead);
 
         // Finished with password database and file.
         spwEnd();
