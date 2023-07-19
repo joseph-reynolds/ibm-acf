@@ -1,5 +1,8 @@
 #pragma once
 
+#include <errno.h>
+#include <grp.h>
+#include <pwd.h>
 #include <shadow.h>
 #include <unistd.h>
 
@@ -13,68 +16,99 @@ class TacfSpw
     /*
      * @brief Implementation specific value definitions.
      */
-    static constexpr auto spwFilePath = "/etc/shadow";
-    static constexpr auto adminName   = "admin";
+    static constexpr auto spwFilePath     = "/etc/shadow";
+    static constexpr auto pwFilePath      = "/etc/passwd";
+    static constexpr auto noPassword      = "x";
+    static constexpr auto invalidPassword = "*";
+    static constexpr auto noUserHome      = "/nonexistent";
+    static constexpr auto noUserShell     = "/sbin/nologin";
 
   public:
     /**
-     * Reset the admin user account.
-     * @brief Reset the admin.
+     * Reset the user password if the user exists.
+     * @brief Reset the user password.
      *
-     * @param adminSpw  The value to use for admin user shadow password.
+     * @param userName  Name of the user to reset.
+     * @param userSpw   The value to use for user shadow password.
      *
      * @return A non-zero error value or zero on success.
      */
-    int resetAdmin(const std::string& adminSpw)
+    int resetUserPassword(const std::string& userName,
+                          const std::string& userSpw)
     {
-        // Prepare for shadow password database access.
-        setspent();
-
-        // If admin user does not exist we can not reset.
-        if (nullptr == getspnam(adminName))
+        // If user does not exist we can not reset.
+        if (nullptr == getspnam(userName.c_str()))
         {
+            // Signal ok to cleanup and return.
             endspent();
             return 1;
         }
 
-        // Reset the admin user shadow password.
-        return spwSetSpw(adminName, adminSpw);
+        // Set the user shadow password.
+        return spwSetSpw(userName, userSpw);
+    }
+
+    /**
+     * Create the user passwd file entry if user does not exist.
+     * @brief Create the user the user.
+     *
+     * @param userName  Name of the user to reset.
+     *
+     * @return A non-zero error value or zero on success.
+     */
+    int createUser(const std::string& userName)
+    {
+        // If user exists in shadow and passwd we are done.
+        if (nullptr != getpwnam(userName.c_str()) &&
+            nullptr != getspnam(userName.c_str()))
+        {
+            // Signal ok to cleanup and return.
+            endpwent();
+            return 0;
+        }
+
+        return spwCreateUser(userName, spwGetUid(userName),
+                             spwGetGid(userName));
     }
 
   private:
     FILE* spwFile = nullptr;
+    FILE* pwFile  = nullptr;
 
     /**
-     * Update the admin user shadow password and expire the password.
-     * @brief Reset the admin user account password.
+     * Update the user shadow password and expire the password.
+     * @brief Update the shadow password.
      *
-     * @param spw  The value to set as the admin user shadow password.
-     * @param name The name of the admin user.
+     * @param spw  The value to set as the shadow password.
+     * @param name The name of the user.
      *
      * @return A non-zero error value or zero on success.
      */
     int spwSetSpw(const std::string& name, const std::string& spw)
     {
+        int rc = 1;
+
         // Need name, password and access to shadow password file.
         if (name.empty() || spw.empty() || spwBegin())
         {
-            return 1;
+            return rc;
         }
-
-        spwd* spwDbEntry;
-        spwd spwEntry;
 
         // Read shadow entries from file instead of database.
         FILE* spwFileRead = fopen(spwFilePath, "r");
         if (nullptr == spwFileRead)
         {
-            return 1;
+            spwEnd();
+            return rc;
         }
+
+        spwd* spwDbEntry;
+        spwd spwEntry;
 
         // Read each shadow password entry.
         while ((spwDbEntry = fgetspent(spwFileRead)))
         {
-            // If the admin user name is found, save the details and skip.
+            // If user entry found save for later and skip.
             if (name == spwDbEntry->sp_namp)
             {
                 spwEntry           = *spwDbEntry;
@@ -86,16 +120,105 @@ class TacfSpw
             // Write shadow password entry to shadow password file.
             putspent(spwDbEntry, spwFile);
         }
-        // Write admin user entry, will discard if empty.
-        putspent(&spwEntry, spwFile);
+
+        // Write updated user entry to shadow password file.
+        rc = putspent(&spwEntry, spwFile);
 
         // Close the read file handle.
         fclose(spwFileRead);
 
-        // Finished with password database and file.
         spwEnd();
+        return rc;
+    }
 
-        return 0;
+    /**
+     * Create an entry in the passwd file.
+     * @brief Add to passwd file.
+     *
+     * @param entryName Name of the entry to create.
+     * @param userId    Uid for the entry.
+     * @param groupId   Gid for the entry.
+     *
+     * @return A non-zero error value or zero on success.
+     */
+    int spwCreatePasswdEntry(const std::string& entryName, uid_t userId,
+                             uid_t groupId)
+    {
+        // Rquires valid name, uid and gid.
+        if (entryName.empty() || !userId || !groupId)
+        {
+            return 1;
+        }
+        // Create user passwd file entry
+        passwd pwEntry = {(char*)entryName.c_str(),
+                          (char*)noPassword,
+                          userId,
+                          groupId,
+                          nullptr,
+                          (char*)noUserHome,
+                          (char*)noUserShell};
+        // Write user record to passwd file
+        fseek(pwFile, 0, SEEK_END);
+        return putpwent(&pwEntry, pwFile);
+    }
+
+    /**
+     * Create an entry in the shadow file.
+     * @brief Add to shadow file.
+     *
+     * @param entryName  Name of the entry to add.
+     *
+     * @return A non-zero error value or zero on success.
+     */
+    int spwCreateShadowEntry(const std::string& entryName)
+    {
+        // Requires valid name.
+        if (entryName.empty())
+        {
+            return 1;
+        }
+        // Create user shadow file entry.
+        spwd spwEntry = {(char*)entryName.c_str(),
+                         (char*)invalidPassword,
+                         0,
+                         0,
+                         99999,
+                         7,
+                         -1,
+                         -1,
+                         0};
+        // Write user record to shadow file
+        fseek(spwFile, 0, SEEK_END);
+        return putspent(&spwEntry, spwFile);
+    }
+
+    /**
+     * Create the user passwd file entry.
+     * @brief Create the user passwd entry.
+     *
+     * @param user      Name of the user to create.
+     * @param userId    Uid of the user.
+     * @param groupId   Gid of the user.
+     *
+     * @return A non-zero error value or zero on success.
+     */
+    int spwCreateUser(const std::string& userName, uid_t userId, uid_t groupId)
+    {
+        int rc = spwBegin();
+
+        // Create passwd entry if it does not exist.
+        if (!rc && nullptr == getpwnam(userName.c_str()))
+        {
+            rc = spwCreatePasswdEntry(userName, userId, groupId);
+        }
+        // Create shadow entry if it does not exist.
+        if (!rc && nullptr == getspnam(userName.c_str()))
+        {
+            rc = spwCreateShadowEntry(userName);
+        }
+
+        spwEnd();
+        return rc;
     }
 
     /**
@@ -111,18 +234,43 @@ class TacfSpw
         // Verify we have shadow password file opened.
         if (nullptr != spwFile)
         {
-            // Files size may have changed so truncate.
-            long int fsize = ftell(spwFile);
-            if (ftruncate(fileno(spwFile), fsize) < 0)
+            off_t fpos = ftello(spwFile);
+
+            // If file was changed then size may have changed.
+            if (0 != fpos)
             {
-                rc = 1;
+                if (ftruncate(fileno(spwFile), fpos) < 0)
+                {
+                    rc = 1;
+                }
             }
 
             // Close the shadow password file.
             fclose(spwFile);
+
+            spwFile = nullptr;
+        }
+        return rc;
+    }
+
+    /**
+     * Update passwd file size and close file.
+     * @brief Close passwd file.
+     *
+     * @return A non-zero error value or zero on success.
+     */
+    int pwClose()
+    {
+        int rc = 0;
+
+        // Verify we have passwd file opened.
+        if (nullptr != pwFile)
+        {
+            // Close the shadow password file.
+            fclose(pwFile);
         }
 
-        spwFile = nullptr;
+        pwFile = nullptr;
 
         return rc;
     }
@@ -148,6 +296,26 @@ class TacfSpw
     }
 
     /**
+     * Open the passwd file for reading and writing.
+     * @brief Open passwd file.
+     *
+     * @return A non-zero error value or zero on success.
+     */
+    int pwOpen()
+    {
+        // Verify passwd file not opened.
+        if (nullptr != pwFile)
+        {
+            return 1;
+        }
+
+        // Open the passwd file.
+        pwFile = fopen(pwFilePath, "a+");
+
+        return nullptr == pwFile ? 1 : 0;
+    }
+
+    /**
      * Initialize shadow password database and open shadow password file.
      * @brief Begin shadow password file changes.
      *
@@ -170,11 +338,8 @@ class TacfSpw
             return 1;
         }
 
-        // Initialize shadow password database.
-        setspent();
-
-        // If can not open shadow password file.
-        if (spwOpen())
+        // If can not open password files.
+        if (spwOpen() || pwOpen())
         {
             // Relese shadow password resources.
             spwEnd();
@@ -193,13 +358,101 @@ class TacfSpw
      */
     void spwEnd()
     {
-        // Close shadow password file.
+        // Close password files.
         spwClose();
+        pwClose();
 
-        // Release shadow password database resources.
+        // Release password database resources.
         endspent();
+        endpwent();
 
         // Release shadow password file.
         ulckpwdf();
+    }
+
+    /**
+     * Get exisiting gid or find an available gid.
+     * @brief Get gid.
+     *
+     * @param groupName Group to get gid for.
+     *
+     * @return A non-zero error value or zero on success.
+     */
+    uid_t spwGetGid(const std::string& groupName)
+    {
+        uid_t gid = 0;
+
+        // Get group info from group database.
+        group* groupEntry = getgrnam(groupName.c_str());
+
+        // If user group exists get gid.
+        if (nullptr != groupEntry)
+        {
+            gid = groupEntry->gr_gid;
+        }
+        else
+        {
+            // Try to find an available gid.
+            uid_t groupId = 1000;
+            errno         = 0;
+
+            while (groupId <= 9999 &&
+                   (!(nullptr == getgrgid(groupId) && 0 == errno)))
+            {
+                groupId++;
+                errno = 0;
+            }
+
+            // Found an available gid.
+            if (groupId <= 9999)
+            {
+                gid = groupId;
+            }
+        }
+
+        return gid;
+    }
+
+    /**
+     * Get exisiting uid or find an available uid.
+     * @brief Get uid.
+     *
+     * @param userName  User to get uid for.
+     *
+     * @return A non-zero error value or zero on success.
+     */
+    uid_t spwGetUid(const std::string& userName)
+    {
+        uid_t uid = 0;
+
+        // Get user info from passwd database.
+        passwd* passwdEntry = getpwnam(userName.c_str());
+
+        // If user exists get uid.
+        if (nullptr != passwdEntry)
+        {
+            uid = passwdEntry->pw_uid;
+        }
+        else
+        {
+            // Try to find an available uid.
+            uid_t userId = 1000;
+            errno        = 0;
+
+            while (userId <= 9999 &&
+                   (!(nullptr == getpwuid(userId) && 0 == errno)))
+            {
+                userId++;
+                errno = 0;
+            }
+
+            // Found an available uid.
+            if (userId <= 9999)
+            {
+                uid = userId;
+            }
+        }
+
+        return uid;
     }
 };

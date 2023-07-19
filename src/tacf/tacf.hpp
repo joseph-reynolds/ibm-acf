@@ -38,6 +38,11 @@ constexpr auto serialNumberEmpty = "       ";
 
 constexpr auto serialNumberUnset = "UNSET";
 
+constexpr auto adminName = "admin";
+
+constexpr auto privilegeAdmin = "priv-admin";
+constexpr auto privilegeUser  = "priv-user";
+
 // Function pointers for optional alternate functions.
 typedef void (*logging_function)(std::string);
 typedef void (*logging_function_pam)(void*, std::string);
@@ -312,11 +317,30 @@ class Tacf : TargetedAcf
      */
     virtual int resetAdmin(const std::string& spw) final override
     {
-        if (TacfSpw().resetAdmin(spw))
+        const std::vector<std::string> adminGroups = {"web", "redfish"};
+
+        // Create admin user account using dbus interfaces.
+        TacfDbus().createUser(adminName, adminGroups, privilegeAdmin);
+
+        // Create admin user using system interfaces.
+        TacfSpw().createUser(adminName);
+
+        // Add admin user to groups using dbus interface.
+        TacfDbus().userPrivilege(adminName, privilegeUser);
+        TacfDbus().userPrivilege(adminName, privilegeAdmin);
+
+        // Set admin user password using system interfaces.
+        if (TacfSpw().resetUserPassword(adminName, spw))
         {
             log("acfv2 reset error");
             return tacfSystemError;
         }
+
+        // Enable the admin user account using dbus interface.
+        TacfDbus().enableUser(adminName);
+
+        // Unlock admin user account using dbus interface.
+        TacfDbus().unlockUser(adminName);
 
         return tacfSuccess;
     }

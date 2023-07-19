@@ -133,27 +133,27 @@ class TacfDbus
      */
     int writeReplayId(uint64_t replay) const
     {
-        // Craft the dbus method for writing the replay Id.
-        auto bus = sdbusplus::bus::new_system();
-        auto method =
-            bus.new_method_call("com.ibm.VPD.Manager", "/com/ibm/VPD/Manager",
-                                "com.ibm.VPD.Manager", "WriteKeyword");
-
-        // Convert to bytes.
-        std::vector<uint8_t> replayBytes;
-        for (size_t i = 0; i < sizeof(replay); ++i)
-        {
-            replayBytes.push_back((uint8_t)(replay >> (8 * i)));
-        }
-
-        // Append the dbus method parameters.
-        method.append(
-            static_cast<sdbusplus::message::object_path>(
-                "/xyz/openbmc_project/inventory/system/chassis/motherboard"),
-            "UTIL", "F0", replayBytes);
-
         try
         {
+            // Craft the dbus method for writing the replay Id.
+            auto bus    = sdbusplus::bus::new_system();
+            auto method = bus.new_method_call(
+                "com.ibm.VPD.Manager", "/com/ibm/VPD/Manager",
+                "com.ibm.VPD.Manager", "WriteKeyword");
+
+            // Convert to bytes.
+            std::vector<uint8_t> replayBytes;
+            for (size_t i = 0; i < sizeof(replay); ++i)
+            {
+                replayBytes.push_back((uint8_t)(replay >> (8 * i)));
+            }
+
+            // Append the dbus method parameters.
+            method.append(static_cast<sdbusplus::message::object_path>(
+                              "/xyz/openbmc_project/inventory/system/chassis/"
+                              "motherboard"),
+                          "UTIL", "F0", replayBytes);
+
             // Check if dbus method call returned an error.
             auto response = bus.call(method);
             if (response.is_method_error())
@@ -169,16 +169,121 @@ class TacfDbus
         return 0;
     }
 
+    /**
+     * Unlock a users login acount using dbus interface.
+     * @brief Unlock user login account.
+     *
+     * @param userName  Name of the user account to unlock
+     * @param state     State value to set
+     *
+     * @return A non-zero error value or zero on success.
+     */
+    int unlockUser(const std::string& userName, bool state = false) const
+    {
+        // Target the appropriate user
+        sdbusplus::message::object_path userPath("/xyz/openbmc_project/user");
+        userPath /= userName;
+        std::string propertyPath(userPath);
+
+        PropertyVariant message = state;
+
+        // Set the property
+        return dbusSetProperty("xyz.openbmc_project.User.Manager", propertyPath,
+                               "xyz.openbmc_project.User.Attributes",
+                               "UserLockedForFailedAttempt", message);
+    }
+
+    /**
+     * Enable or disable a users login acount using dbus interface.
+     * @brief Enable user login account.
+     *
+     * @param userName  Name of the user account to enable
+     * @param state     State value to set
+     *
+     * @return A non-zero error value or zero on success.
+     */
+    int enableUser(const std::string& userName, bool state = true) const
+    {
+        // Target the appropriate user
+        sdbusplus::message::object_path userPath("/xyz/openbmc_project/user");
+        userPath /= userName;
+        std::string propertyPath(userPath);
+
+        PropertyVariant message = state;
+
+        // Set the property
+        return dbusSetProperty("xyz.openbmc_project.User.Manager", propertyPath,
+                               "xyz.openbmc_project.User.Attributes",
+                               "UserEnabled", message);
+    }
+
+    /**
+     * Set user privilege level using dbus interface.
+     * @brief Set user privilege level.
+     *
+     * @param userName          Name of the user account to set privilege
+     * @param userPrivilege     Privilege value to set
+     *
+     * @return A non-zero error value or zero on success.
+     */
+    int userPrivilege(const std::string& userName,
+                      const std::string& userPrivilege) const
+    {
+        // Target the appropriate user
+        sdbusplus::message::object_path userPath("/xyz/openbmc_project/user");
+        userPath /= userName;
+        std::string propertyPath(userPath);
+
+        PropertyVariant message = userPrivilege;
+
+        // Set the property
+        return dbusSetProperty("xyz.openbmc_project.User.Manager", propertyPath,
+                               "xyz.openbmc_project.User.Attributes",
+                               "UserPrivilege", message);
+    }
+
+    /**
+     * Create a new user using dbus interface.
+     * @brief Create a user.
+     *
+     * @param userName      Name of the User to create
+     * @param groupNames    Groups to make the user is a member of
+     * @param privilege    privilege level of the user
+     *
+     * @return A non-zero error value or zero on success.
+     */
+    int createUser(const std::string& userName,
+                   const std::vector<std::string> groupNames,
+                   const std::string& privilege) const
+    {
+        auto bus = sdbusplus::bus::new_system();
+        try
+        {
+            // Craft the dbus method for creating the user.
+            auto method = bus.new_method_call(
+                "xyz.openbmc_project.User.Manager", "/xyz/openbmc_project/user",
+                "xyz.openbmc_project.User.Manager", "CreateUser");
+            method.append(userName, groupNames, privilege, true);
+
+            bus.call(method);
+        }
+        catch (const sdbusplus::exception_t& e)
+        {
+            return 1;
+        }
+        return 0;
+    }
+
   private:
     /**
      * Retrieve a property stored as a dbus property.
      * @brief Retrieve a property.
      *
-     * @param service   The service hosting the property object and interface.
-     * @param path      The path of the dbus object hosting the interface .
+     * @param service   The service hosting the object and interface.
+     * @param path      The path of the dbus object hosting the interface.
      * @param interface The interface for reading the property.
      * @param property  The property to get.
-     * @param message   The message returned by the dbus get property method.
+     * @param message   The message returned by the get property method.
      *
      * @return A non-zero error value or zero on success.
      */
@@ -186,16 +291,15 @@ class TacfDbus
                         std::string interface, std::string property,
                         PropertyVariant& message) const
     {
-        // Craft the dbus method for reading the specified property.
-        auto bus = sdbusplus::bus::new_default();
-        auto method =
-            bus.new_method_call(service.c_str(), path.c_str(),
-                                "org.freedesktop.DBus.Properties", "Get");
-        method.append(interface, property);
-
-        // Try to read the dbus property.
         try
         {
+            // Craft the dbus method for reading the specified property.
+            auto bus = sdbusplus::bus::new_default();
+            auto method =
+                bus.new_method_call(service.c_str(), path.c_str(),
+                                    "org.freedesktop.DBus.Properties", "Get");
+            method.append(interface, property);
+
             // Check if dbus method call returned an error.
             auto response = bus.call(method);
             if (response.is_method_error())
@@ -207,6 +311,41 @@ class TacfDbus
             response.read(message);
         }
         catch (const std::exception& exc)
+        {
+            return 1;
+        }
+
+        return 0;
+    }
+
+    /**
+     * Write a property stored as a dbus property.
+     * @brief Set a property.
+     *
+     * @param service   Service hosting the object and interface.
+     * @param path      Path of the dbus object hosting the interface.
+     * @param interface Interface for accessing the property.
+     * @param property  Property to access.
+     * @param message   Value to set.
+     *
+     * @return A non-zero error value or zero on success.
+     */
+    int dbusSetProperty(std::string service, std::string path,
+                        std::string interface, std::string property,
+                        PropertyVariant& message) const
+    {
+        try
+        {
+            // Craft the dbus method for writing the specified property.
+            auto bus = sdbusplus::bus::new_system();
+            auto method =
+                bus.new_method_call(service.c_str(), path.c_str(),
+                                    "org.freedesktop.DBus.Properties", "Set");
+            method.append(interface.c_str(), property.c_str(), message);
+
+            auto response = bus.call(method);
+        }
+        catch (const std::exception& e)
         {
             return 1;
         }
