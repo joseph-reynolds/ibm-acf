@@ -263,51 +263,9 @@ CeLogin::CeLoginRc CeLogin::createCeLoginAcfV1Signature(
         size_t sJsonSignatureSize = 0;
         generatedSignatureParm =
             std::vector<uint8_t>((EVP_PKEY_bits(sPrivateKey) + 7) / 8);
-        EVP_PKEY_CTX* sCtx = EVP_PKEY_CTX_new(sPrivateKey, NULL);
-        int sResult = 1;
-        if (!sCtx)
-        {
-            sResult = 0;
-        }
-        if (1 == sResult)
-        {
-            sResult = EVP_PKEY_sign_init(sCtx);
-        }
-        if (1 == sResult)
-        {
-            sResult = EVP_PKEY_CTX_set_rsa_padding(sCtx, RSA_PKCS1_PADDING);
-        }
-        if (1 == sResult)
-        {
-            sResult = EVP_PKEY_CTX_set_signature_md(sCtx, EVP_sha512());
-        }
-        if (1 == sResult)
-        {
-            // This call calculates the final signature length
-            sResult =
-                EVP_PKEY_sign(sCtx, NULL, &sJsonSignatureSize,
-                              jsonDigestParm.data(), jsonDigestParm.size());
-            if ((1 == sResult) &&
-                (generatedSignatureParm.size() == sJsonSignatureSize))
-            {
-                // This call creates the signature
-                sResult = EVP_PKEY_sign(
-                    sCtx, generatedSignatureParm.data(), &sJsonSignatureSize,
-                    jsonDigestParm.data(), jsonDigestParm.size());
-            }
-            else
-            {
-                sResult = 0;
-            }
-        }
-        if (1 != sResult)
-        {
-            sRc = CeLoginRc::Failure;
-        }
-        if (sCtx)
-        {
-            EVP_PKEY_CTX_free(sCtx);
-        }
+        sRc = createSignature(sPrivateKey, EVP_sha512(),
+                              jsonDigestParm, generatedSignatureParm,
+                              sJsonSignatureSize);
     }
     else
     {

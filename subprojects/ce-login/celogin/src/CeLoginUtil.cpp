@@ -233,40 +233,10 @@ CeLogin::CeLoginRc CeLogin::decodeAndVerifyAcf(
     // Verify signature over SourceFileData
     if (CeLoginRc::Success == sRc)
     {
-        int sVerifyResult = 1;
-        EVP_PKEY_CTX* sCtx = EVP_PKEY_CTX_new(sPublicKey, NULL);
-        if (!sCtx)
-        {
-            sVerifyResult = 0;
-        }
-        if (1 == sVerifyResult)
-        {
-            sVerifyResult = EVP_PKEY_verify_init(sCtx);
-        }
-        if (1 == sVerifyResult)
-        {
-            sVerifyResult =
-                EVP_PKEY_CTX_set_rsa_padding(sCtx, RSA_PKCS1_PADDING);
-        }
-        if (1 == sVerifyResult)
-        {
-            sVerifyResult = EVP_PKEY_CTX_set_signature_md(sCtx, EVP_sha512());
-        }
-        if (1 == sVerifyResult)
-        {
-            sVerifyResult =
-                EVP_PKEY_verify(sCtx, decodedAsnParm->signature->data,
-                                decodedAsnParm->signature->length,
-                                sHashReceivedJson, sizeof(sHashReceivedJson));
-        }
-        if (1 != sVerifyResult)
-        {
-            sRc = CeLoginRc::SignatureNotValid;
-        }
-        if (sCtx)
-        {
-            EVP_PKEY_CTX_free(sCtx);
-        }
+        sRc = verifySignature(sPublicKey, EVP_sha512(),
+                              decodedAsnParm->signature->data,
+                              decodedAsnParm->signature->length,
+                              sHashReceivedJson, sizeof(sHashReceivedJson));
     }
     if (sPublicKey)
     {
@@ -329,40 +299,10 @@ CeLogin::CeLoginRc CeLogin::decodeAndVerifySignature(
     // Verify signature over SourceFileData
     if (CeLoginRc::Success == sRc)
     {
-        int sVerifyResult = 1;
-        EVP_PKEY_CTX* sCtx = EVP_PKEY_CTX_new(sPublicKey, NULL /* no engine */);
-        if (!sCtx)
-        {
-            sVerifyResult = 0;
-        }
-        if (1 == sVerifyResult)
-        {
-            sVerifyResult = EVP_PKEY_verify_init(sCtx);
-        }
-        if (1 == sVerifyResult)
-        {
-            sVerifyResult =
-                EVP_PKEY_CTX_set_rsa_padding(sCtx, RSA_PKCS1_PADDING);
-        }
-        if (1 == sVerifyResult)
-        {
-            sVerifyResult = EVP_PKEY_CTX_set_signature_md(sCtx, EVP_sha512());
-        }
-        if (1 == sVerifyResult)
-        {
-            sVerifyResult =
-                EVP_PKEY_verify(sCtx, decodedAsnParm->signature->data,
-                                decodedAsnParm->signature->length,
-                                sHashReceivedJson, sizeof(sHashReceivedJson));
-        }
-        if (1 != sVerifyResult)
-        {
-            sRc = CeLoginRc::SignatureNotValid;
-        }
-        if (sCtx)
-        {
-            EVP_PKEY_CTX_free(sCtx);
-        }
+        sRc = verifySignature(sPublicKey, EVP_sha512(),
+                              decodedAsnParm->signature->data,
+                              decodedAsnParm->signature->length,
+                              sHashReceivedJson, sizeof(sHashReceivedJson));
     }
 
     if (sPublicKey)
@@ -547,6 +487,101 @@ CeLogin::CeLoginRc CeLogin::getServiceAuthorityFromFrameworkEc(
         {
             sRc = CeLoginRc::GetAuthFromFrameworkEc_InvalidFrameworkEc;
         }
+    }
+    return sRc;
+}
+
+CeLogin::CeLoginRc CeLogin::createSignature(EVP_PKEY* privateKeyParm, const EVP_MD* mdParm,
+                                            const std::vector<uint8_t>& digestParm,
+                                            std::vector<uint8_t>& generatedSignatureParm,
+                                            size_t& signatureSizeParm)
+{
+    CeLoginRc sRc = CeLoginRc::Success;
+    EVP_PKEY_CTX* sCtx = EVP_PKEY_CTX_new(privateKeyParm, NULL);
+    int sResult = 1;
+    if (!sCtx)
+    {
+        sResult = 0;
+    }
+    if (1 == sResult)
+    {
+        sResult = EVP_PKEY_sign_init(sCtx);
+    }
+    if (1 == sResult)
+    {
+        sResult = EVP_PKEY_CTX_set_rsa_padding(sCtx, RSA_PKCS1_PADDING);
+    }
+    if (1 == sResult)
+    {
+        sResult = EVP_PKEY_CTX_set_signature_md(sCtx, mdParm);
+    }
+    if (1 == sResult)
+    {
+        // This call calculates the final signature length
+        sResult =
+            EVP_PKEY_sign(sCtx, NULL, &signatureSizeParm,
+                            digestParm.data(), digestParm.size());
+        if ((1 == sResult) &&
+            (generatedSignatureParm.size() == signatureSizeParm))
+        {
+            // This call creates the signature
+            sResult = EVP_PKEY_sign(
+                sCtx, generatedSignatureParm.data(), &signatureSizeParm,
+                digestParm.data(), digestParm.size());
+        }
+        else
+        {
+            sResult = 0;
+        }
+    }
+    if (1 != sResult)
+    {
+        sRc = CeLoginRc::Failure;
+    }
+    if (sCtx)
+    {
+        EVP_PKEY_CTX_free(sCtx);
+    }
+    return sRc;
+}
+
+CeLogin::CeLoginRc CeLogin::verifySignature(EVP_PKEY* publicKeyParm, const EVP_MD* mdTypeParm, 
+                                            const uint8_t* signatureParm, size_t signatureLengthParm,
+                                            const uint8_t* digestParm, size_t digestLengthParm)
+{
+    CeLoginRc sRc = CeLoginRc::Success;
+    int sVerifyResult = 1;
+    EVP_PKEY_CTX* sCtx = EVP_PKEY_CTX_new(publicKeyParm, NULL /* no engine */);
+    if (!sCtx)
+    {
+        sVerifyResult = 0;
+    }
+    if (1 == sVerifyResult)
+    {
+        sVerifyResult = EVP_PKEY_verify_init(sCtx);
+    }
+    if (1 == sVerifyResult)
+    {
+        sVerifyResult = EVP_PKEY_CTX_set_rsa_padding(sCtx, RSA_PKCS1_PADDING);
+    }
+    if (1 == sVerifyResult)
+    {
+        sVerifyResult = EVP_PKEY_CTX_set_signature_md(sCtx, mdTypeParm);
+    }
+    if (1 == sVerifyResult)
+    {
+        sVerifyResult =
+            EVP_PKEY_verify(sCtx, signatureParm,
+                            signatureLengthParm,
+                            digestParm, digestLengthParm);
+    }
+    if (1 != sVerifyResult)
+    {
+        sRc = CeLoginRc::SignatureNotValid;
+    }
+    if (sCtx)
+    {
+        EVP_PKEY_CTX_free(sCtx);
     }
     return sRc;
 }
