@@ -4,6 +4,8 @@
 #include <CeLogin.h>
 #include <openssl/obj_mac.h>
 #include <openssl/sha.h>
+#include <openssl/evp.h>
+#include <vector>
 
 #ifndef _CELOGINUTIL_H
 #define _CELOGINUTIL_H
@@ -73,6 +75,15 @@ CeLoginRc
     getServiceAuthorityFromFrameworkEc(const char* frameworkEcParm,
                                        const uint64_t frameworkEcLengthParm,
                                        ServiceAuthority& authParm);
+
+CeLoginRc verifySignature(EVP_PKEY* publicKeyParm, const EVP_MD* mdTypeParm, 
+                          const uint8_t* signatureParm, size_t signatureLengthParm,
+                          const uint8_t* digestParm, size_t digestLengthParm);
+
+CeLoginRc createSignature(EVP_PKEY* privateKeyParm, const EVP_MD* mdParm,
+                          const std::vector<uint8_t>& digestParm,
+                          std::vector<uint8_t>& generatedSignatureParm,
+                          size_t& signatureSizeParm);
 }; // namespace CeLogin
 
 #endif

@@ -255,25 +255,17 @@ CeLogin::CeLoginRc CeLogin::createCeLoginAcfV1Signature(
 {
     CeLoginRc sRc = CeLoginRc::Success;
     const uint8_t* sConstPrivateKey = argsParm.mPrivateKey.data();
-    RSA* sPrivateKey =
-        d2i_RSAPrivateKey(NULL, &sConstPrivateKey, argsParm.mPrivateKey.size());
+    EVP_PKEY* sPrivateKey = d2i_PrivateKey(
+        EVP_PKEY_RSA, NULL, &sConstPrivateKey, argsParm.mPrivateKey.size());
     // TODO: Verify size matches expected size
     if (sPrivateKey)
     {
-        unsigned int sJsonSignatureSize = 0;
-        generatedSignatureParm = std::vector<uint8_t>(RSA_size(sPrivateKey));
-        int sResult =
-            RSA_sign(CeLogin::CeLogin_Digest_NID, jsonDigestParm.data(),
-                     jsonDigestParm.size(), generatedSignatureParm.data(),
-                     &sJsonSignatureSize, sPrivateKey);
-        if (1 != sResult)
-        {
-            sRc = CeLoginRc::Failure;
-        }
-        else if (sJsonSignatureSize != generatedSignatureParm.size())
-        {
-            sRc = CeLoginRc::Failure;
-        }
+        size_t sJsonSignatureSize = 0;
+        generatedSignatureParm =
+            std::vector<uint8_t>((EVP_PKEY_bits(sPrivateKey) + 7) / 8);
+        sRc = createSignature(sPrivateKey, EVP_sha512(),
+                              jsonDigestParm, generatedSignatureParm,
+                              sJsonSignatureSize);
     }
     else
     {
@@ -283,7 +275,7 @@ CeLogin::CeLoginRc CeLogin::createCeLoginAcfV1Signature(
 
     if (sPrivateKey)
     {
-        RSA_free(sPrivateKey);
+        EVP_PKEY_free(sPrivateKey);
     }
 
     if (sRc != CeLoginRc::Success)

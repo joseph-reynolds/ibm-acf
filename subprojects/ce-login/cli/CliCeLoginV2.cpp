@@ -1,9 +1,9 @@
 #include "CliCeLoginV2.h"
-#include "CliTypes.h"
 
 #include "../celogin/src/CeLoginAsnV1.h"
 #include "../celogin/src/CeLoginJson.h"
 #include "../celogin/src/CeLoginUtil.h"
+#include "CliTypes.h"
 #include "CliUtils.h"
 
 #include <CeLogin.h>
@@ -11,6 +11,7 @@
 #include <json-c/json.h>
 #include <openssl/asn1.h>
 #include <openssl/asn1t.h>
+#include <openssl/evp.h>
 #include <openssl/obj_mac.h>
 #include <openssl/objects.h>
 #include <openssl/rand.h>
@@ -312,24 +313,58 @@ CeLogin::CeLoginRc CeLogin::createCeLoginAcfV2Signature(
     const CeLoginCreateHsfArgsV1& sArgsV1 = argsParm.mV1Args;
 
     const uint8_t* sConstPrivateKey = sArgsV1.mPrivateKey.data();
-    RSA* sPrivateKey =
-        d2i_RSAPrivateKey(NULL, &sConstPrivateKey, sArgsV1.mPrivateKey.size());
+    EVP_PKEY* sPrivateKey = d2i_PrivateKey(
+        EVP_PKEY_RSA, NULL, &sConstPrivateKey, sArgsV1.mPrivateKey.size());
     // TODO: Verify size matches expected size
     if (sPrivateKey)
     {
-        unsigned int sJsonSignatureSize = 0;
-        generatedSignatureParm = std::vector<uint8_t>(RSA_size(sPrivateKey));
-        int sResult =
-            RSA_sign(CeLogin::CeLogin_Digest_NID, jsonDigestParm.data(),
-                     jsonDigestParm.size(), generatedSignatureParm.data(),
-                     &sJsonSignatureSize, sPrivateKey);
+        size_t sJsonSignatureSize = 0;
+        generatedSignatureParm =
+            std::vector<uint8_t>((EVP_PKEY_bits(sPrivateKey) + 7) / 8);
+        EVP_PKEY_CTX* sCtx = EVP_PKEY_CTX_new(sPrivateKey, NULL);
+        int sResult = 1;
+        if (!sCtx)
+        {
+            sResult = 0;
+        }
+        if (1 == sResult)
+        {
+            sResult = EVP_PKEY_sign_init(sCtx);
+        }
+        if (1 == sResult)
+        {
+            sResult = EVP_PKEY_CTX_set_rsa_padding(sCtx, RSA_PKCS1_PADDING);
+        }
+        if (1 == sResult)
+        {
+            sResult = EVP_PKEY_CTX_set_signature_md(sCtx, EVP_sha512());
+        }
+        if (1 == sResult)
+        {
+            // This call calculates the final signature length
+            sResult =
+                EVP_PKEY_sign(sCtx, NULL, &sJsonSignatureSize,
+                              jsonDigestParm.data(), jsonDigestParm.size());
+            if ((1 == sResult) &&
+                (generatedSignatureParm.size() == sJsonSignatureSize))
+            {
+                // This call creates the signature
+                sResult = EVP_PKEY_sign(
+                    sCtx, generatedSignatureParm.data(), &sJsonSignatureSize,
+                    jsonDigestParm.data(), jsonDigestParm.size());
+            }
+            else
+            {
+                sResult = 0;
+            }
+        }
         if (1 != sResult)
         {
             sRc = CeLoginRc::Failure;
         }
-        else if (sJsonSignatureSize != generatedSignatureParm.size())
+        if (sCtx)
         {
-            sRc = CeLoginRc::Failure;
+            EVP_PKEY_CTX_free(sCtx);
         }
     }
     else
@@ -340,7 +375,7 @@ CeLogin::CeLoginRc CeLogin::createCeLoginAcfV2Signature(
 
     if (sPrivateKey)
     {
-        RSA_free(sPrivateKey);
+        EVP_PKEY_free(sPrivateKey);
     }
 
     if (sRc != CeLoginRc::Success)
