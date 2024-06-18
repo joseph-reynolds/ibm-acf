@@ -82,7 +82,7 @@ fi
 
 ## Upload the ACF
 service_acf_base64=$(base64 -w 0 -i ${ACF})
-OUTPUT=`curl  -k -H "X-Auth-Token: $TOKEN" -X PATCH -d '{"Oem":{"IBM":{"ACF":{"ACFFile":"'${service_acf_base64}'"}}}}' https://${BMC}/redfish/v1/AccountService/Accounts/service 2>/dev/null`
+OUTPUT=`curl  -k -H "X-Auth-Token: $TOKEN" -H "Content-Type: application/json" -X PATCH -d '{"Oem":{"IBM":{"ACF":{"ACFFile":"'${service_acf_base64}'"}}}}' https://${BMC}/redfish/v1/AccountService/Accounts/service 2>/dev/null`
 
 if [[ $OUTPUT = *'"ACFInstalled": true'* ]]; then
     echo "ACF successfully installed to ${BMC}"
