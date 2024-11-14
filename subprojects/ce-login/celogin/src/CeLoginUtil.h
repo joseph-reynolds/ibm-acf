@@ -2,9 +2,9 @@
 #include "JsmnUtils.h"
 
 #include <CeLogin.h>
+#include <openssl/evp.h>
 #include <openssl/obj_mac.h>
 #include <openssl/sha.h>
-#include <openssl/evp.h>
 
 #ifndef _CELOGINUTIL_H
 #define _CELOGINUTIL_H
@@ -85,22 +85,31 @@ CeLoginRc
 /// @param[in] digestParm input digest
 /// @param[in] digestLengthParm input digest length
 /// @return CeLoginRc
-CeLoginRc verifySignature(EVP_PKEY* publicKeyParm, const EVP_MD* mdTypeParm, 
-                          const uint8_t* signatureParm, size_t signatureLengthParm,
-                          const uint8_t* digestParm, size_t digestLengthParm);
+CeLoginRc verifySignature(EVP_PKEY* publicKeyParm, const EVP_MD* mdTypeParm,
+                          const uint8_t* signatureParm,
+                          size_t signatureLengthParm, const uint8_t* digestParm,
+                          size_t digestLengthParm);
 
-/// @brief Generic wrapper for creating a signature with OpenSSL  
+/// @brief Generic wrapper for creating a signature with OpenSSL
 /// @param[in] privateKeyParm input private key to create the signature with
 /// @param[in] mdParm message digest type
 /// @param[in] digestParm input digest
 /// @param[in] digestParmLength length of input digest buffer
 /// @param[out] generatedSignatureParm output signature buffer
-/// @param[inout] signatureSizeParm input signature buffer size, output generated signature size
+/// @param[inout] signatureSizeParm input signature buffer size, output
+/// generated signature size
 /// @return CeLoginRc
 CeLoginRc createSignature(EVP_PKEY* privateKeyParm, const EVP_MD* mdParm,
                           const uint8_t* digestParm, size_t digestParmLength,
                           uint8_t* generatedSignatureParm,
                           size_t& signatureSizeParm);
+
+CeLoginRc base64Decode(const char*  inputParm,
+                       const size_t inputLenParm,
+                       uint8_t*     decodedOutputParm,
+                       const size_t decodedOutputLenParm,
+                       size_t&      numDecodedBytesParm);
+
 }; // namespace CeLogin
 
 #endif
